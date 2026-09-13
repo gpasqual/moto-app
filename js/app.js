@@ -7,7 +7,7 @@ import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -604,17 +604,53 @@ $('btnDeleteSel').addEventListener('click', async () => {
   for (const id of S.selected) await deleteSession(id);
   S.selected.clear(); S.selectMode = false; renderHistory();
 });
+// Share a file through the OS share sheet (iOS: AirDrop / Save to Files / Dropbox), or download it.
+async function shareFile(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: file.name }); } catch { /* cancelled */ }
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a'); a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+// Full session export for the PC video pipeline: summary + GPS track + raw IMU columns, gzipped JSON.
+async function exportJson(s) {
+  toast(t('exporting'), 10000);
+  const full = s.track ? s : await getSession(s.id);
+  let imu = null;
+  if (full.samplesSource === 'imu' && full.imuCount) { try { imu = await getImu(full.id); } catch { /* no raw log */ } }
+  const cols = imu ? ['t', 'lean', 'ax', 'ay', 'az', 'gx', 'gy', 'gz'] : null;
+  const round = (arr, d) => { const k = 10 ** d, out = new Array(arr.length); for (let i = 0; i < arr.length; i++) { const v = arr[i]; out[i] = Number.isFinite(v) ? Math.round(v * k) / k : null; } return out; };
+  const payload = {
+    format: 'moto-ng-session', formatVersion: 1, app: APP_NAME, appVersion: VERSION,
+    id: full.id, startTime: full.startTime, endTime: full.endTime, startTimeIso: new Date(full.startTime).toISOString(),
+    duration: full.duration, movingTime: full.movingTime, distance: full.distance,
+    maxSpeed: full.maxSpeed, avgSpeed: full.avgSpeed, maxAccel: full.maxAccel, maxBrake: full.maxBrake, brakeDist: full.brakeDist,
+    maxLeanL: full.maxLeanL, maxLeanR: full.maxLeanR,
+    accelSign: full.accelSign || 1, gyroSign: full.gyroSign || 1,
+    trackColumns: ['t_ms', 'lat', 'lng', 'speed_ms', 'lean_deg', 'alt_m'], track: full.track,
+    imu: imu ? { rate: imu.rate, columns: cols, note: 't in ms since startTime; a* m/s² long/lat/vert, g* deg/s roll/pitch/yaw, bike axes, raw platform sign (apply accelSign/gyroSign)',
+      t: Array.from(imu.t), lean: round(imu.lean, 1), ax: round(imu.ax, 3), ay: round(imu.ay, 3), az: round(imu.az, 3), gx: round(imu.gx, 2), gy: round(imu.gy, 2), gz: round(imu.gz, 2) } : null,
+    samples: !imu && full.samples ? full.samples : undefined,
+  };
+  const json = JSON.stringify(payload);
+  const base = `moto-ng-${new Date(full.startTime).toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
+  let file;
+  if (typeof CompressionStream === 'function') {
+    const gz = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+    file = new File([await new Response(gz).blob()], `${base}.json.gz`, { type: 'application/gzip' });
+  } else {
+    file = new File([json], `${base}.json`, { type: 'application/json' });
+  }
+  $('toast').classList.add('hidden');
+  await shareFile(file);
+}
 async function exportGpx(s) {
   const full = s.track ? s : await getSession(s.id);
   const gpx = sessionToGpx(full);
   const fname = `ride-${new Date(full.startTime).toISOString().slice(0, 16).replace(/[:T]/g, '-')}.gpx`;
-  const file = new File([gpx], fname, { type: 'application/gpx+xml' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: fname }); return; } catch { /* cancelled */ return; }
-  }
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  await shareFile(new File([gpx], fname, { type: 'application/gpx+xml' }));
 }
 function openDetail(s) {
   S.detailSession = s;
@@ -751,6 +787,7 @@ $('anSmooth').addEventListener('input', e => {
   if (chart && anData) chart.setChannels(anChannels());
 });
 $('btnDetailGpx').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
+$('btnDetailJson').addEventListener('click', () => S.detailSession && exportJson(S.detailSession));
 $('btnDetailDelete').addEventListener('click', async () => {
   if (!S.detailSession || !await confirmSheet(t('deleteConfirm', { n: 1 }), t('yesDelete'))) return;
   await deleteSession(S.detailSession.id); closeSheet('sheetDetail'); renderHistory();

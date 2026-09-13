@@ -37,7 +37,7 @@ const STRINGS = {
     noSessions: 'No sessions yet. Tap ▶ to start recording a ride.',
     deleteN: 'Delete ({n})', deleteConfirm: 'Delete {n} session(s)?',
     sessionDetail: 'Session', duration: 'Duration', distance: 'Distance', movingTime: 'Moving time',
-    exportGpx: 'Export GPX', analytics: 'Analytics',
+    exportGpx: 'Export GPX', exportData: 'Export data (for video overlay)', exporting: 'Preparing export…', analytics: 'Analytics',
     chSpeed: 'Speed', chLean: 'Lean', chLong: 'Long. accel', chLat: 'Lat. accel', chVert: 'Vert. accel', chRoll: 'Roll rate', chPitch: 'Pitch rate', chYaw: 'Yaw rate',
     anHint: 'Drag to pan · pinch or scroll to zoom · tap for values · double-tap to reset', srcImu: 'IMU {n} Hz', srcGps: 'GPS-derived', smoothing: 'Smoothing', raw: 'Raw',
     // Navigator
@@ -100,7 +100,7 @@ const STRINGS = {
     noSessions: 'Nessuna sessione. Tocca ▶ per registrare un giro.',
     deleteN: 'Elimina ({n})', deleteConfirm: 'Eliminare {n} sessione/i?',
     sessionDetail: 'Sessione', duration: 'Durata', distance: 'Distanza', movingTime: 'Tempo in movimento',
-    exportGpx: 'Esporta GPX', analytics: 'Analisi',
+    exportGpx: 'Esporta GPX', exportData: 'Esporta dati (per overlay video)', exporting: 'Preparazione export…', analytics: 'Analisi',
     chSpeed: 'Velocità', chLean: 'Piega', chLong: 'Acc. longitudinale', chLat: 'Acc. laterale', chVert: 'Acc. verticale', chRoll: 'Vel. rollio', chPitch: 'Vel. beccheggio', chYaw: 'Vel. imbardata',
     anHint: 'Trascina per spostare · pizzica o scorri per zoomare · tocca per i valori · doppio tocco per reimpostare', srcImu: 'IMU {n} Hz', srcGps: 'derivato da GPS', smoothing: 'Media mobile', raw: 'Grezzo',
     searchDest: 'Cerca destinazione…', searching: 'Ricerca…', noResults: 'Nessun risultato.',
