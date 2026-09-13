@@ -157,12 +157,18 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 
 /* ===== Sheets ===== */
 .sheet { position: fixed; inset: 0; z-index: 2000; }
+#sheetDialog { z-index: 2500; } /* confirm sheet sits above history/detail/settings */
 .sheet-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
 .sheet-menu .sheet-body { position: absolute; left: 10px; right: 10px; bottom: calc(var(--sab) + 10px); display: flex; flex-direction: column; gap: 6px; animation: up 0.2s ease-out; }
 @keyframes up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .menu-item { display: flex; align-items: center; gap: 14px; background: #1a1a20; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font-size: 18px; font-weight: 600; }
 .menu-item svg { font-size: 24px; }
 .menu-item.cancel { justify-content: center; color: var(--accent); background: #101014; margin-top: 4px; }
+.menu-item.primary { justify-content: center; background: var(--accent); color: #111; }
+.menu-item.danger { justify-content: center; color: var(--red); }
+.menu-item.plain { justify-content: center; }
+.dialog-title { text-align: center; color: #d8d8e0; font-size: 16px; font-weight: 600; padding: 12px 16px 8px; line-height: 1.4; }
+#dlgButtons { display: flex; flex-direction: column; gap: 6px; }
 .sheet-full { background: #0d0d11; display: flex; flex-direction: column; animation: slide 0.22s ease-out; }
 @keyframes slide { from { transform: translateY(100%); } to { transform: none; } }
 .sheet-full .sheet-body { display: flex; flex-direction: column; height: 100%; padding-top: var(--sat); padding-bottom: var(--sab); }

@@ -6,7 +6,7 @@ import { createGauge } from './gauge.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -219,18 +219,23 @@ function startRecording() {
 }
 async function stopRecording() {
   if (!S.recording) return;
-  if (!confirm(t('stopConfirm'))) return;
+  const choice = await ask(t('stopTitle'), [
+    { label: t('saveSession'), value: 'save', style: 'primary' },
+    { label: t('discard'), value: 'discard', style: 'danger' },
+    { label: t('keepRecording'), value: null, style: 'cancel' },
+  ]);
+  if (!choice) return; // keep recording
   S.recording = false;
   const data = S.stats.finish();
   $('btnStart').classList.remove('recording');
   $('btnStart').innerHTML = '<svg><use href="#i-play"/></svg>';
-  if (data.track.length >= 3 && data.distance > 20) {
-    try { await saveSession(data); } catch (e) { console.error(e); }
-  }
   updateWakeLock();
+  if (choice === 'discard') { toast(t('sessionDiscarded')); return; }
+  try { await saveSession(data); toast(t('sessionSaved')); }
+  catch (e) { console.error(e); toast(t('saveFailed'), 4000); }
 }
-function resetStats() {
-  if (!confirm(t('resetConfirm'))) return;
+async function resetStats() {
+  if (!await confirmSheet(t('resetConfirm'), t('yesReset'))) return;
   const wasRec = S.recording;
   S.stats = new Session();
   if (wasRec) S.map.clearTrack();
@@ -291,6 +296,28 @@ function openSheet(id) { $(id).classList.remove('hidden'); }
 function closeSheet(id) { $(id).classList.add('hidden'); }
 document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => closeSheet(el.closest('.sheet').id)));
 
+// In-app action sheet instead of the browser's OK/Cancel dialog. Resolves with the chosen button's value, or null.
+// buttons: [{ label, value, style: 'primary' | 'danger' | 'plain' | 'cancel' }]
+let dialogResolve = null;
+function ask(title, buttons) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    $('toast').classList.add('hidden'); // don't let a toast overlap the choices
+    $('dlgTitle').textContent = title;
+    const box = $('dlgButtons'); box.innerHTML = '';
+    for (const b of buttons) {
+      const btn = document.createElement('button');
+      btn.className = `menu-item ${b.style || 'plain'}`;
+      btn.innerHTML = '<span></span>'; btn.firstChild.textContent = b.label;
+      btn.addEventListener('click', () => { closeSheet('sheetDialog'); dialogResolve = null; resolve(b.value ?? null); });
+      box.appendChild(btn);
+    }
+    openSheet('sheetDialog');
+  });
+}
+document.querySelector('[data-dialog-cancel]').addEventListener('click', () => { closeSheet('sheetDialog'); if (dialogResolve) { dialogResolve(null); dialogResolve = null; } });
+const confirmSheet = async (title, yesLabel) => (await ask(title, [{ label: yesLabel, value: true, style: 'danger' }, { label: t('cancel'), value: null, style: 'cancel' }])) === true;
+
 // ---------------- Navigation ----------------
 function speakIf(text) { if (S.settings.voice) speak(text); }
 
@@ -336,8 +363,8 @@ function startNavigation() {
   updateWakeLock();
   if (S.lastFix) updateGuidance(S.lastFix);
 }
-function endNavigation(confirmFirst = false) {
-  if (confirmFirst && !confirm(t('endNavConfirm'))) return;
+async function endNavigation(confirmFirst = false) {
+  if (confirmFirst && !await confirmSheet(t('endNavConfirm'), t('yesEnd'))) return;
   S.guidance = null; S.route = null;
   S.map.clearRoute();
   $('navBanner').classList.add('hidden');
@@ -494,7 +521,7 @@ async function renderHistory() {
 }
 $('btnSelect').addEventListener('click', () => { S.selectMode = !S.selectMode; S.selected.clear(); renderHistory(); });
 $('btnDeleteSel').addEventListener('click', async () => {
-  if (!S.selected.size || !confirm(t('deleteConfirm', { n: S.selected.size }))) return;
+  if (!S.selected.size || !await confirmSheet(t('deleteConfirm', { n: S.selected.size }), t('yesDelete'))) return;
   for (const id of S.selected) await deleteSession(id);
   S.selected.clear(); S.selectMode = false; renderHistory();
 });
@@ -528,12 +555,13 @@ function openDetail(s) {
   }
   const pts = s.track.map(p => [p[1], p[2]]);
   S.detailTrack.setLatLngs(pts);
+  $('detailMap').classList.toggle('hidden', pts.length === 0); // no GPS fixes recorded: nothing to map
   setTimeout(() => { S.detailMap.invalidateSize(); if (pts.length) S.detailMap.fitBounds(S.detailTrack.getBounds(), { padding: [20, 20] }); }, 80);
 }
 $('btnDetailShare').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
 $('btnDetailGpx').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
 $('btnDetailDelete').addEventListener('click', async () => {
-  if (!S.detailSession || !confirm(t('deleteConfirm', { n: 1 }))) return;
+  if (!S.detailSession || !await confirmSheet(t('deleteConfirm', { n: 1 }), t('yesDelete'))) return;
   await deleteSession(S.detailSession.id); closeSheet('sheetDetail'); renderHistory();
 });
 
@@ -608,7 +636,7 @@ function renderAbout() {
   $('aboutShareBtn').addEventListener('click', shareApp);
   $('aboutCopyBtn').addEventListener('click', async () => { try { await navigator.clipboard.writeText(APP_URL); toast(t('copied')); } catch { prompt('URL', APP_URL); } });
 }
-$('btnClearHistory').addEventListener('click', async () => { if (confirm(t('clearConfirm'))) { await clearSessions(); toast('OK'); } });
+$('btnClearHistory').addEventListener('click', async () => { if (await confirmSheet(t('clearConfirm'), t('yesDeleteAll'))) { await clearSessions(); toast('OK'); } });
 
 // First user gesture: wake lock needs one on some browsers.
 document.addEventListener('pointerdown', () => updateWakeLock(), { once: true });
