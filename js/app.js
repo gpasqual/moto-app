@@ -1,13 +1,13 @@
 import { t, setLang, getLang, applyDom, aboutContent } from './i18n.js';
 import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibration, saveCalibration, saveSession, deleteSession, clearSessions, listSessions, getSession } from './storage.js';
-import { LeanEstimator } from './lean.js';
+import { LeanEstimator, leanInFrame } from './lean.js';
 import { Session, RideSimulator, haversine } from './telemetry.js';
 import { createGauge } from './gauge.js';
 import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.2.1';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -29,6 +29,7 @@ const S = {
   guidance: null,            // active turn-by-turn
   wakeLock: null,
   selectMode: false, selected: new Set(),
+  calBefore: null,
   detailMap: null, detailSession: null,
 };
 
@@ -268,11 +269,26 @@ async function calibrate() {
   const ok = await requestMotion(true);
   if (!ok) return;
   $('btnCal').classList.add('busy'); $('btnCal').textContent = t('calibrating');
-  S.stats.maxLeanL = 0; S.stats.maxLeanR = 0; paintLeanMax(); // a new reference invalidates earlier maxes
+  S.calBefore = S.lean.cal; // remembered so the session maxes can be corrected for the reference shift
   S.lean.startCalibration(1200);
+}
+// After a re-CAL the old maxes are off by exactly the roll shift between the two references, so shift them back.
+// A shift beyond 30° means the phone was moved/turned, not touched up: those maxes were meaningless.
+function correctMaxesForRecal(newCal) {
+  const old = S.calBefore; S.calBefore = null;
+  if (!old || !newCal) return;
+  let delta = leanInFrame(old, newCal.g0); // what the old reference read for the new "upright"
+  if (S.settings.invertLean) delta = -delta;
+  if (Math.abs(delta) > 30) { S.stats.maxLeanL = 0; S.stats.maxLeanR = 0; }
+  else {
+    S.stats.maxLeanR = Math.max(0, S.stats.maxLeanR - delta);
+    S.stats.maxLeanL = Math.max(0, S.stats.maxLeanL + delta);
+  }
+  paintLeanMax();
 }
 S.lean.onCalibrated = cal => {
   saveCalibration(cal);
+  if (S.calBefore) correctMaxesForRecal(S.lean.cal);
   if ($('btnCal').classList.contains('busy')) {
     $('btnCal').classList.remove('busy'); $('btnCal').textContent = t('cal');
     toast(t('calibrated'));

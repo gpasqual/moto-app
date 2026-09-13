@@ -89,7 +89,9 @@ roll calculation projects out, so they do not affect lean.
 
 Turning the phone portrait ↔ landscape looks like a 90° roll to the sensors; the app listens for screen-orientation
 changes and rotates the calibration frame to match (direction confirmed against the gravity vector), so a landscape
-mount works without re-calibrating. CAL resets the session lean maxes; an orientation change rolls them back 2 s.
+mount works without re-calibrating. A re-CAL shifts the session lean maxes by the change in reference (and zeroes
+them only if the reference moved by more than 30°, i.e. the phone was turned in hand); an orientation change rolls
+them back 2 s.
 
 ## 4. Project layout
 

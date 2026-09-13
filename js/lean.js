@@ -44,6 +44,14 @@ const FORWARD_RAW = {
   bag: [0, 1, 0],
 };
 
+// Lean angle (degrees, +right) of a down vector `g` measured in calibration frame `cal`.
+export function leanInFrame(cal, g) {
+  const { g0, f, r } = cal;
+  const gPerp = sub(g, scale(f, dot(g, f)));
+  const a = Math.atan2(dot(gPerp, r), dot(gPerp, g0)) * DEG;
+  return Number.isFinite(a) ? a : 0;
+}
+
 // A road bike cannot lean beyond this; larger readings are handling / mount artefacts.
 export const MAX_VALID_LEAN = 70;
 
