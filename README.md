@@ -1,7 +1,7 @@
-# MOTO SPEED — motorcycle dashboard PWA
+# MOTO-NG — motorcycle dashboard PWA
 
 A personal riding dashboard that runs as an installable web app on the phone (iPhone or Android).
-Modelled on the "MOTO SPEED" iOS app (see `reference/` screenshots).
+Live at **https://gpasqual.github.io/moto-app/**. Dashboard design inspired by the "MOTO SPEED" iOS app.
 
 **Live data**
 - Speed (GPS), session max, moving average
@@ -15,6 +15,7 @@ Modelled on the "MOTO SPEED" iOS app (see `reference/` screenshots).
   with voice announcements, re-routing, ETA + remaining, favourites, nearby fuel/food/hotels/parking, GPX import
 - Settings: panel colour, phone mount position, invert L/R, language (EN/IT), km/h / mph,
   voice on/off, map light/dark, keep screen on, demo mode
+- About screen (Settings › About) with install/share QR code, offline/online behaviour, privacy, first-ride checklist
 - Works offline for the dashboard (map tiles and routing need data)
 
 No accounts, no keys, no backend. Everything is stored on the phone (IndexedDB / localStorage).
@@ -41,7 +42,7 @@ host is GitHub Pages:
    ```bash
    git init
    git add .
-   git commit -m "MOTO SPEED PWA"
+   git commit -m "MOTO-NG PWA"
    git branch -M main
    git remote add origin https://github.com/<you>/moto-app.git
    git push -u origin main
@@ -98,6 +99,7 @@ js/i18n.js              EN / IT strings
 sw.js                   service worker (network-first app shell, offline fallback)
 manifest.webmanifest    PWA manifest; icons/ generated PNGs
 vendor/leaflet/         Leaflet 1.9.4 (vendored, works offline)
+vendor/qrcode/          qrcode-generator 1.4.4 (About-screen QR code)
 reference/              screenshots of the app this one resembles
 ```
 

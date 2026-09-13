@@ -258,7 +258,7 @@ export function sessionToGpx(s) {
   const pts = s.track.map(([t, lat, lng, speed, lean, alt]) =>
     `      <trkpt lat="${lat}" lon="${lng}">${alt != null ? `<ele>${alt}</ele>` : ''}<time>${new Date(t).toISOString()}</time><extensions><speed>${speed}</speed><lean>${lean}</lean></extensions></trkpt>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="MotoSpeed PWA" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="MOTO-NG" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${esc(name)}</name><time>${new Date(s.startTime).toISOString()}</time></metadata>
   <trk><name>${esc(name)}</name>
     <desc>distance=${Math.round(s.distance)}m maxSpeed=${(s.maxSpeed * 3.6).toFixed(1)}km/h avgSpeed=${(s.avgSpeed * 3.6).toFixed(1)}km/h maxAccel=${s.maxAccel.toFixed(2)} maxBrake=${s.maxBrake.toFixed(2)} leanL=${Math.round(s.maxLeanL)} leanR=${Math.round(s.maxLeanR)}</desc>

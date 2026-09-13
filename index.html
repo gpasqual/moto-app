@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>MOTO SPEED</title>
-  <meta name="description" content="Motorcycle dashboard: speed, lean angle, acceleration, braking, GPS map and navigation.">
+  <title>MOTO-NG</title>
+  <meta name="description" content="MOTO-NG — motorcycle dashboard: speed, lean angle, acceleration, braking, GPS map and navigation.">
   <meta name="theme-color" content="#0a0a0c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="MOTO SPEED">
+  <meta name="apple-mobile-web-app-title" content="MOTO-NG">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -71,7 +71,7 @@
     <div class="title">
       <span data-i18n="appTitleA">MOTO</span>
       <button id="btnReset" class="reset-btn" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>
-      <span data-i18n="appTitleB">SPEED</span>
+      <span data-i18n="appTitleB">NG</span>
     </div>
     <button id="btnMenu" class="round-btn menu" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
   </header>
@@ -188,7 +188,10 @@
       </div>
 
       <div class="group-title"><svg class="c-orange"><use href="#i-info"/></svg><span data-i18n="about">ABOUT</span></div>
-      <div class="group"><div class="row"><span data-i18n="version">Version</span><span class="muted" id="appVersion"></span></div></div>
+      <div class="group">
+        <button class="row row-btn" id="btnAbout"><svg><use href="#i-info"/></svg><span data-i18n="aboutApp">About MOTO-NG</span></button>
+        <div class="row"><span data-i18n="version">Version</span><span class="muted" id="appVersion"></span></div>
+      </div>
       <div style="height:40px"></div>
     </div>
   </div>
@@ -253,9 +256,18 @@
   </div>
 </div>
 
+<!-- ===== About ===== -->
+<div id="sheetAbout" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><button class="link-btn" data-close data-i18n="back">Back</button><h2 data-i18n="aboutApp">About MOTO-NG</h2><button class="link-btn" id="btnAboutShare" aria-label="Share"><svg class="btn-ic"><use href="#i-share"/></svg></button></div>
+    <div class="sheet-scroll" id="aboutBody"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/qrcode/qrcode.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

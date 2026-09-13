@@ -1,4 +1,4 @@
-import { t, setLang, getLang, applyDom } from './i18n.js';
+import { t, setLang, getLang, applyDom, aboutContent } from './i18n.js';
 import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibration, saveCalibration, saveSession, deleteSession, clearSessions, listSessions, getSession } from './storage.js';
 import { LeanEstimator } from './lean.js';
 import { Session, RideSimulator, haversine } from './telemetry.js';
@@ -6,7 +6,10 @@ import { createGauge } from './gauge.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
+const APP_NAME = 'MOTO-NG';
+const APP_URL = 'https://gpasqual.github.io/moto-app/';
+const REPO_URL = 'https://github.com/gpasqual/moto-app';
 const $ = id => document.getElementById(id);
 
 // ---------------- State ----------------
@@ -565,6 +568,46 @@ $('setFollow').addEventListener('change', e => updateSetting('follow', e.target.
 $('setAwake').addEventListener('change', e => updateSetting('keepAwake', e.target.checked));
 $('setDemo').addEventListener('change', e => updateSetting('demo', e.target.checked));
 $('btnTestVoice').addEventListener('click', () => speak(t('testVoiceText')));
+$('btnAbout').addEventListener('click', () => { renderAbout(); openSheet('sheetAbout'); });
+$('btnAboutShare').addEventListener('click', shareApp);
+
+// ---------------- About ----------------
+async function shareApp() {
+  if (navigator.share) {
+    try { await navigator.share({ title: APP_NAME, text: `${APP_NAME} — ${aboutContent().tagline}`, url: APP_URL }); } catch { /* cancelled */ }
+    return;
+  }
+  try { await navigator.clipboard.writeText(APP_URL); toast(t('copied')); } catch { prompt('URL', APP_URL); }
+}
+function renderAbout() {
+  const c = aboutContent();
+  const box = $('aboutBody');
+  const esc = v => String(v).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
+  const section = s => {
+    let h = `<div class="about-section"><h3>${esc(s.h)}</h3>`;
+    for (const p of s.p || []) h += `<p>${esc(p)}</p>`;
+    if (s.li) h += `<ul>${s.li.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    if (s.kv) h += `<dl>${s.kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
+    return h + '</div>';
+  };
+  let qr = '';
+  try { const q = window.qrcode(0, 'M'); q.addData(APP_URL); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch { /* no QR */ }
+  box.innerHTML = `
+    <div class="about-hero">
+      <img src="icons/icon-192.png" alt="" class="about-icon">
+      <div class="about-name">${APP_NAME}</div>
+      <div class="about-ver">${t('version')} ${VERSION}</div>
+      <p class="about-tag">${esc(c.tagline)}</p>
+    </div>
+    <div class="about-qr">${qr}<div class="about-url">${APP_URL.replace('https://', '')}</div>
+      <div class="about-btns"><button class="big-btn accent" id="aboutShareBtn">${t('shareLink')}</button><button class="big-btn" id="aboutCopyBtn">${t('copyLink')}</button></div>
+    </div>
+    ${section(c.install)}${section(c.offline)}${section(c.privacy)}${section(c.firstRide)}${section(c.numbers)}${section(c.services)}${section(c.credits)}
+    <div class="about-section"><p><a class="about-link" href="${REPO_URL}" target="_blank" rel="noopener">${t('sourceCode')}: github.com/gpasqual/moto-app</a></p></div>
+    <div style="height:40px"></div>`;
+  $('aboutShareBtn').addEventListener('click', shareApp);
+  $('aboutCopyBtn').addEventListener('click', async () => { try { await navigator.clipboard.writeText(APP_URL); toast(t('copied')); } catch { prompt('URL', APP_URL); } });
+}
 $('btnClearHistory').addEventListener('click', async () => { if (confirm(t('clearConfirm'))) { await clearSessions(); toast('OK'); } });
 
 // First user gesture: wake lock needs one on some browsers.

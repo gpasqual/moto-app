@@ -1,7 +1,7 @@
 // Two languages: English and Italian (the reference app is Italian).
 const STRINGS = {
   en: {
-    appTitleA: 'MOTO', appTitleB: 'SPEED',
+    appTitleA: 'MOTO', appTitleB: 'NG',
     start: 'Start', stop: 'Stop', reset: 'Reset',
     resetConfirm: 'Reset the current session stats?',
     stopConfirm: 'Stop and save this session?',
@@ -30,7 +30,7 @@ const STRINGS = {
     display: 'DISPLAY', keepAwake: 'Keep screen on', demoMode: 'Demo mode (simulated ride)',
     demoHint: 'Fakes GPS and lean data so you can see the dashboard working indoors.',
     data: 'DATA', clearHistory: 'Delete all sessions', clearConfirm: 'Delete all saved sessions? This cannot be undone.',
-    about: 'ABOUT', version: 'Version',
+    about: 'ABOUT', version: 'Version', aboutApp: 'About MOTO-NG', shareLink: 'Share link', copyLink: 'Copy link', copied: 'Link copied', sourceCode: 'Source code',
     // History
     noSessions: 'No sessions yet. Tap ▶ to start recording a ride.',
     deleteN: 'Delete ({n})', deleteConfirm: 'Delete {n} session(s)?',
@@ -62,7 +62,7 @@ const STRINGS = {
     hmm: '{h}h {m}m',
   },
   it: {
-    appTitleA: 'MOTO', appTitleB: 'SPEED',
+    appTitleA: 'MOTO', appTitleB: 'NG',
     start: 'Avvia', stop: 'Stop', reset: 'Azzera',
     resetConfirm: 'Azzerare le statistiche della sessione corrente?',
     stopConfirm: 'Terminare e salvare questa sessione?',
@@ -90,7 +90,7 @@ const STRINGS = {
     display: 'SCHERMO', keepAwake: 'Schermo sempre acceso', demoMode: 'Modalità demo (giro simulato)',
     demoHint: 'Simula GPS e piega per vedere il cruscotto funzionare al chiuso.',
     data: 'DATI', clearHistory: 'Elimina tutte le sessioni', clearConfirm: 'Eliminare tutte le sessioni salvate? Operazione irreversibile.',
-    about: 'INFO', version: 'Versione',
+    about: 'INFO', version: 'Versione', aboutApp: 'Info su MOTO-NG', shareLink: 'Condividi link', copyLink: 'Copia link', copied: 'Link copiato', sourceCode: 'Codice sorgente',
     noSessions: 'Nessuna sessione. Tocca ▶ per registrare un giro.',
     deleteN: 'Elimina ({n})', deleteConfirm: 'Eliminare {n} sessione/i?',
     sessionDetail: 'Sessione', duration: 'Durata', distance: 'Distanza', movingTime: 'Tempo in movimento',
@@ -137,3 +137,118 @@ export function applyDom(root = document) {
   root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
 }
+
+// About screen content. Each section: { h: heading, p: [paragraphs], li: [bullets], kv: [[label, text]] }.
+const ABOUT = {
+  en: {
+    tagline: 'Motorcycle dashboard that runs entirely on your phone. No account, no server, no app store.',
+    install: {
+      h: 'Install & share',
+      p: ['Anyone can use MOTO-NG: send them the link or let them scan the code above.'],
+      li: [
+        'iPhone: open the link in Safari → Share → "Add to Home Screen".',
+        'Android: open in Chrome → menu → "Install app".',
+        'Launch it from the home-screen icon — it runs full screen.',
+      ],
+    },
+    offline: {
+      h: 'On the road',
+      p: ['It does not need a PC or a signal to work as a dashboard.'],
+      kv: [
+        ['Works offline', 'speed, lean angle, acceleration & braking stats, session recording, history, GPX export, opening the app.'],
+        ['Needs mobile data', 'new map tiles, destination search, route calculation, re-routing, nearby places. A route already calculated keeps guiding you through short signal gaps.'],
+        ['Foreground only', 'like every web app it pauses when the screen locks or you switch apps. "Keep screen on" is enabled by default; plug in for long rides.'],
+      ],
+    },
+    privacy: {
+      h: 'Your data',
+      li: [
+        'Sessions, history, favourites and calibration are stored only on this phone.',
+        'Nobody — including the author — can see your rides. A GPX file leaves the phone only when you share it.',
+        'Search text and your position are sent to the map services only when you search or calculate a route, as with any map app.',
+      ],
+    },
+    firstRide: {
+      h: 'First ride checklist',
+      li: [
+        'Mount the phone, then set Settings › Phone position (Handlebar or Frame/Tank).',
+        'With the bike upright and the bars straight, tap CAL. It is remembered; re-CAL if you move the mount.',
+        'Tap ▶ to record a session, ■ to stop and save it. ⟳ zeroes the live stats.',
+        'If the gauge leans the wrong way on your mount, use Settings › Invert left/right.',
+        'Tap ⤢ on the map for full-screen map with a speed/lean pill — best when navigating.',
+      ],
+    },
+    numbers: {
+      h: 'How the numbers are computed',
+      kv: [
+        ['Speed', 'GPS Doppler speed; max is the session peak.'],
+        ['Ø AVG', 'distance ÷ moving time (time above 3.6 km/h).'],
+        ['MAX ACC / MAX BRAKE', 'change of GPS speed per second, lightly smoothed, glitches rejected.'],
+        ['BRAKE DIST', 'metres covered during the hardest braking event of the session.'],
+        ['Lean', 'phone attitude (gyro + accelerometer fused by the OS) → roll about the bike\'s forward axis, relative to the CAL reference. Right is positive. Very long sweeping corners may drift a few degrees toward zero — a limit of phone sensors.'],
+      ],
+    },
+    services: {
+      h: 'Map & routing services',
+      p: ['Free public OpenStreetMap services, used directly from the phone: OSM map tiles, Nominatim (search), the OSRM demo router, Overpass (nearby places).',
+          'They are meant for light, personal use — fine for you and your riding friends, not for large-scale distribution. Map data © OpenStreetMap contributors.'],
+    },
+    credits: { h: 'Credits', p: ['Built with Leaflet and qrcode-generator (MIT). Dashboard design inspired by the MOTO SPEED app.'] },
+  },
+  it: {
+    tagline: 'Cruscotto moto che gira interamente sul tuo telefono. Nessun account, nessun server, nessun app store.',
+    install: {
+      h: 'Installa e condividi',
+      p: ['Chiunque può usare MOTO-NG: mandagli il link o fagli inquadrare il codice qui sopra.'],
+      li: [
+        'iPhone: apri il link in Safari → Condividi → "Aggiungi alla schermata Home".',
+        'Android: apri in Chrome → menu → "Installa app".',
+        "Avviala dall'icona nella Home: gira a schermo intero.",
+      ],
+    },
+    offline: {
+      h: 'In viaggio',
+      p: ['Non serve un PC né il segnale per funzionare come cruscotto.'],
+      kv: [
+        ['Funziona offline', 'velocità, angolo di piega, accelerazione e frenata, registrazione sessioni, storico, esportazione GPX, avvio dell\'app.'],
+        ['Serve la rete', 'nuove tessere della mappa, ricerca destinazioni, calcolo percorso, ricalcolo, luoghi nelle vicinanze. Un percorso già calcolato continua a guidarti anche senza segnale per brevi tratti.'],
+        ['Solo in primo piano', 'come ogni web app si ferma se blocchi lo schermo o cambi app. "Schermo sempre acceso" è attivo di default; collega il telefono alla corrente nei giri lunghi.'],
+      ],
+    },
+    privacy: {
+      h: 'I tuoi dati',
+      li: [
+        'Sessioni, storico, preferiti e calibrazione restano solo su questo telefono.',
+        "Nessuno — nemmeno l'autore — vede i tuoi giri. Un file GPX esce dal telefono solo quando lo condividi.",
+        'Testo di ricerca e posizione vengono inviati ai servizi mappa solo quando cerchi o calcoli un percorso, come in qualsiasi app di mappe.',
+      ],
+    },
+    firstRide: {
+      h: 'Prima uscita',
+      li: [
+        'Monta il telefono, poi imposta Impostazioni › Posizione telefono (Manubrio o Telaio/Serbatoio).',
+        'Con la moto dritta e il manubrio al centro tocca CAL. Resta memorizzato; rifai CAL se sposti il supporto.',
+        'Tocca ▶ per registrare una sessione, ■ per terminarla e salvarla. ⟳ azzera le statistiche.',
+        'Se la piega risulta invertita sul tuo supporto, usa Impostazioni › Inverti sinistra/destra.',
+        'Tocca ⤢ sulla mappa per la mappa a schermo intero con velocità e piega: ideale in navigazione.',
+      ],
+    },
+    numbers: {
+      h: 'Come vengono calcolati i valori',
+      kv: [
+        ['Velocità', 'velocità Doppler del GPS; il MAX è il picco della sessione.'],
+        ['Ø MEDIA', 'distanza ÷ tempo in movimento (sopra 3,6 km/h).'],
+        ['MAX ACC / FRENATA MAX', 'variazione della velocità GPS al secondo, leggermente filtrata, con scarto degli errori.'],
+        ['SPAZIO FRENATA', 'metri percorsi durante la frenata più forte della sessione.'],
+        ['Piega', "assetto del telefono (giroscopio + accelerometro fusi dal sistema) → rollio attorno all'asse di marcia rispetto al riferimento CAL. Destra positiva. Nelle curve molto lunghe può derivare di qualche grado verso zero: è un limite dei sensori del telefono."],
+      ],
+    },
+    services: {
+      h: 'Servizi mappa e percorsi',
+      p: ['Servizi pubblici gratuiti di OpenStreetMap, usati direttamente dal telefono: tessere OSM, Nominatim (ricerca), router demo OSRM, Overpass (luoghi vicini).',
+          'Sono pensati per un uso leggero e personale: vanno bene per te e i tuoi amici motociclisti, non per una distribuzione su larga scala. Dati mappa © OpenStreetMap contributors.'],
+    },
+    credits: { h: 'Crediti', p: ['Realizzata con Leaflet e qrcode-generator (MIT). Design del cruscotto ispirato all\'app MOTO SPEED.'] },
+  },
+};
+export function aboutContent() { return ABOUT[current] || ABOUT.en; }

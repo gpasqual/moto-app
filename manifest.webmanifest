@@ -1,7 +1,7 @@
 {
-  "name": "MOTO SPEED",
-  "short_name": "MOTO SPEED",
-  "description": "Motorcycle dashboard: speed, lean angle, acceleration, braking, GPS map and navigation.",
+  "name": "MOTO-NG",
+  "short_name": "MOTO-NG",
+  "description": "MOTO-NG — motorcycle dashboard: speed, lean angle, acceleration, braking, GPS map and navigation.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

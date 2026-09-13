@@ -1,10 +1,10 @@
 // App-shell service worker: network-first for our own files (always fresh when online,
 // still works offline), pass-through for map tiles and API calls.
-const VERSION = 'motospeed-v1.0.0';
+const VERSION = 'moto-ng-v1.1.0';
 const SHELL = [
   './', 'index.html', 'css/app.css',
   'js/app.js', 'js/i18n.js', 'js/storage.js', 'js/lean.js', 'js/telemetry.js', 'js/gauge.js', 'js/map.js', 'js/nav.js',
-  'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
+  'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css', 'vendor/qrcode/qrcode.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 
