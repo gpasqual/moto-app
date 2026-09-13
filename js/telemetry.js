@@ -41,6 +41,13 @@ export class Session {
     this.maxLeanL = 0;       // deg
     this.maxLeanR = 0;       // deg
     this.track = [];         // [t, lat, lng, speed, lean, alt]
+    // 5 Hz time history for analytics: [t_ms since start, speed m/s, lean deg, ax, ay, az, gx, gy, gz]
+    // a* = accelerometer in bike axes (long/lat/vert, m/s²), g* = gyro (roll/pitch/yaw rate, deg/s); null when no IMU.
+    this.samples = [];
+    this.samplesSource = 'gps';  // 'imu' once real motion data has been recorded
+    // The platform's sign convention for accelerometer/gyro is not knowable up front (iOS and Android differ),
+    // so we learn it: correlate IMU longitudinal accel with the GPS speed derivative, and roll rate with d(lean)/dt.
+    this._accCorr = 0; this._gyrCorr = 0; this._prevSampleLean = null;
     this._last = null;       // last accepted fix {t, lat, lng, speed}
     this._prevSpeed = null;
     this._accel = 0;
@@ -50,6 +57,20 @@ export class Session {
   }
 
   get elapsed() { return ((this.endTime || Date.now()) - this.startTime) / 1000; }
+  get accelSign() { return this._accCorr < 0 ? -1 : 1; }
+  get gyroSign() { return this._gyrCorr < 0 ? -1 : 1; }
+
+  // One averaged 5 Hz row. a/w are bike-frame [long, lat, vert] / [roll, pitch, yaw] or null.
+  addSample(t, speed, lean, a, w) {
+    if (a) this.samplesSource = 'imu';
+    if (a && Number.isFinite(this._accel)) this._accCorr += a[0] * this._accel;
+    if (w && this._prevSampleLean != null) this._gyrCorr += w[0] * (lean - this._prevSampleLean);
+    this._prevSampleLean = lean;
+    const r2 = v => v == null ? null : Math.round(v * 100) / 100;
+    this.samples.push([t - this.startTime, r2(speed), Math.round(lean * 10) / 10,
+      a ? r2(a[0]) : null, a ? r2(a[1]) : null, a ? r2(a[2]) : null,
+      w ? r2(w[0]) : null, w ? r2(w[1]) : null, w ? r2(w[2]) : null]);
+  }
   get avgSpeed() { return this.movingTime > 1 ? this.distance / this.movingTime : 0; }
   get accel() { return this._accel; }
 
@@ -117,6 +138,7 @@ export class Session {
       duration: this.elapsed, movingTime: this.movingTime, distance: this.distance,
       maxSpeed: this.maxSpeed, avgSpeed: this.avgSpeed, maxAccel: this.maxAccel, maxBrake: this.maxBrake,
       brakeDist: this.brakeDist, maxLeanL: this.maxLeanL, maxLeanR: this.maxLeanR, track: this.track,
+      samples: this.samples, samplesSource: this.samplesSource, accelSign: this.accelSign, gyroSign: this.gyroSign,
     };
   }
 }
@@ -127,9 +149,9 @@ export class RideSimulator {
     this.center = center;
     this.t0 = performance.now();
     this.timer = null;
-    this.onFix = null; this.onLean = null;
+    this.onFix = null; this.onLean = null; this.onMotion = null;
     this.lat = center.lat; this.lng = center.lng;
-    this.speed = 0; this.heading = 0;
+    this.speed = 0; this.heading = 0; this._prevLean = 0;
   }
   start() {
     this.stop();
@@ -146,6 +168,7 @@ export class RideSimulator {
       else if (p < 28) target = 25 + 6 * Math.sin(p);
       else if (p < 34) target = Math.max(0, 30 - (p - 28) * 5.5); // hard brake
       else target = 1;
+      const prevSpeed = this.speed;
       this.speed += (target - this.speed) * Math.min(1, dt * 1.5);
       // Heading wanders; lean follows turn rate
       const turnRate = 18 * Math.sin(s / 6) + 10 * Math.sin(s / 2.3); // deg/s
@@ -157,6 +180,14 @@ export class RideSimulator {
       this.lat += (d * Math.cos(br)) / 111320;
       this.lng += (d * Math.sin(br)) / (111320 * Math.cos(this.lat * Math.PI / 180));
       this.onLean && this.onLean(lean + (Math.random() - 0.5) * 0.6);
+      if (this.onMotion && dt > 0) {
+        const n = () => (Math.random() - 0.5) * 0.3;
+        const yawRate = turnRate * (1 + n() * 0.2);
+        this.onMotion(
+          [Math.max(-9, Math.min(6, (this.speed - prevSpeed) / dt)) + n(), this.speed * yawRate * Math.PI / 180 + n(), n() * 2],
+          [(lean - this._prevLean) / dt + n() * 4, n() * 3, yawRate]);
+        this._prevLean = lean;
+      }
       if (now - lastFix > 1000) {
         lastFix = now;
         this.onFix && this.onFix({

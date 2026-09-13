@@ -257,6 +257,15 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 
 .toast { position: fixed; z-index: 3000; left: 50%; bottom: calc(var(--sab) + 90px); transform: translateX(-50%); background: rgba(20,20,26,0.95); color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 15px; max-width: 88vw; text-align: center; border: 1px solid var(--accent); box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: up 0.2s ease-out; }
 
+/* ===== Analytics ===== */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 14px 8px; }
+.chip { padding: 7px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #1a1a20; border: 1.5px solid #2a2a33; color: #aaa; }
+.chip.on { border-color: var(--chip, var(--accent)); color: var(--chip, var(--accent)); background: color-mix(in srgb, var(--chip, var(--accent)) 14%, #15151b); }
+.an-chart { flex: 1; min-height: 0; padding: 0 8px; }
+.an-chart canvas { width: 100%; height: 100%; display: block; touch-action: none; -webkit-user-select: none; user-select: none; border-radius: 12px; }
+.an-hint { text-align: center; color: var(--muted); font-size: 11px; padding: 8px 14px 6px; }
+.an-src { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; }
+
 /* ===== About ===== */
 .about-hero { text-align: center; padding: 10px 10px 4px; }
 .about-icon { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }

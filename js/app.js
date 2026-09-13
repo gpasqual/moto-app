@@ -3,10 +3,11 @@ import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibrati
 import { LeanEstimator } from './lean.js';
 import { Session, RideSimulator, haversine } from './telemetry.js';
 import { createGauge } from './gauge.js';
+import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.1.1';
+export const VERSION = '1.2.0';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -155,6 +156,10 @@ async function requestMotion(fromGesture) {
     try {
       const r = await DeviceOrientationEvent.requestPermission();
       if (r !== 'granted') { toast(t('sensorsDenied'), 5000); return false; }
+      // Accelerometer/gyro for the analytics time history (separate permission on iOS; optional)
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch { /* analytics will fall back to GPS-derived data */ }
+      }
     } catch { toast(t('sensorsDenied'), 5000); return false; }
   }
   attachMotion();
@@ -165,14 +170,78 @@ function attachMotion() {
   S.motionAttached = true;
   $('sensorOverlay').classList.add('hidden');
   window.addEventListener('deviceorientation', onOrientation, { passive: true });
+  window.addEventListener('devicemotion', onDeviceMotion, { passive: true });
 }
+
+// ---- Screen orientation: keep the lean reference aligned when the phone is turned portrait <-> landscape
+function currentScreenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  if (typeof window.orientation === 'number') return (window.orientation + 360) % 360;
+  return 0;
+}
+let orientTimer = null;
+function onScreenRotate() {
+  clearTimeout(orientTimer);
+  orientTimer = setTimeout(() => {
+    if (S.settings.demo) return;
+    S.lean.setScreenAngle(currentScreenAngle());
+    // Turning the phone in hand sweeps the reading through big angles: drop maxes gained in the last 2 s.
+    const snap = maxSnapshots.find(x => performance.now() - x.t >= 2000);
+    if (snap) { S.stats.maxLeanL = snap.L; S.stats.maxLeanR = snap.R; paintLeanMax(); }
+    S.map.invalidate();
+  }, 350);
+}
+if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', onScreenRotate);
+window.addEventListener('orientationchange', onScreenRotate);
+const maxSnapshots = []; // newest first, ~3 s of {t, L, R}
+setInterval(() => {
+  maxSnapshots.unshift({ t: performance.now(), L: S.stats.maxLeanL, R: S.stats.maxLeanR });
+  if (maxSnapshots.length > 8) maxSnapshots.length = 8;
+}, 500);
+function paintLeanMax() {
+  $('leanL').textContent = `${Math.round(S.stats.maxLeanL)}°`;
+  $('leanR').textContent = `${Math.round(S.stats.maxLeanR)}°`;
+}
+
+// ---- Motion sampling (accelerometer + gyro projected into bike axes, averaged to 5 Hz while recording)
+const motionWin = { a: [0, 0, 0], w: [0, 0, 0], nA: 0, nW: 0 };
+function accumulateMotion(a, w) {
+  if (a) { motionWin.a[0] += a[0]; motionWin.a[1] += a[1]; motionWin.a[2] += a[2]; motionWin.nA++; }
+  if (w) { motionWin.w[0] += w[0]; motionWin.w[1] += w[1]; motionWin.w[2] += w[2]; motionWin.nW++; }
+}
+function onDeviceMotion(e) {
+  if (S.settings.demo || !S.recording || !S.lean.cal) return;
+  const { f, r, g0 } = S.lean.cal;
+  const dot = (v, u) => v[0] * u[0] + v[1] * u[1] + v[2] * u[2];
+  let a = null, w = null;
+  const acc = e.acceleration;
+  if (acc && acc.x != null) {
+    const v = [acc.x, acc.y, acc.z];
+    a = [dot(v, f), dot(v, r), -dot(v, g0)]; // long (+fwd), lat (+right), vert (+up) — sign learned per session
+  }
+  const rr = e.rotationRate;
+  if (rr && rr.alpha != null) {
+    const v = [rr.beta, rr.gamma, rr.alpha]; // rates about phone x, y, z
+    w = [dot(v, f), dot(v, r), -dot(v, g0)]; // roll, pitch, yaw
+  }
+  accumulateMotion(a, w);
+}
+setInterval(() => {
+  if (!S.recording) { motionWin.nA = motionWin.nW = 0; motionWin.a = [0, 0, 0]; motionWin.w = [0, 0, 0]; return; }
+  const a = motionWin.nA ? motionWin.a.map(x => x / motionWin.nA) : null;
+  const w = motionWin.nW ? motionWin.w.map(x => x / motionWin.nW) : null;
+  motionWin.a = [0, 0, 0]; motionWin.w = [0, 0, 0]; motionWin.nA = motionWin.nW = 0;
+  const speed = S.lastFix && S.lastFix.speed > 0 ? S.lastFix.speed : 0;
+  S.stats.addSample(Date.now(), speed, S.stats.currentLean, a, w);
+}, 200);
+
 let lastLeanPaint = 0;
 function onOrientation(e) {
   if (S.settings.demo) return;
   if (e.beta == null || e.gamma == null) return;
   if (!S.motionGranted) {
     S.motionGranted = true;
-    if (!S.lean.cal && S.settings.autoCal) S.lean.startCalibration(1200);
+    if (!S.lean.cal && S.settings.autoCal) { $('btnCal').classList.add('busy'); S.lean.startCalibration(1200); }
   }
   // Compass heading while stationary (iOS only exposes webkitCompassHeading)
   if (e.webkitCompassHeading != null && (!S.lastFix || (S.lastFix.speed || 0) < 1.5)) {
@@ -181,10 +250,10 @@ function onOrientation(e) {
   }
   const ang = S.lean.update(e.beta, e.gamma);
   if (ang == null) return;
-  applyLean(ang);
+  applyLean(ang, S.lean.valid);
 }
-function applyLean(ang) {
-  S.stats.addLean(ang);
+function applyLean(ang, valid = true) {
+  if (valid) S.stats.addLean(ang); // implausible angles (phone being handled/turned) never feed the maxes
   // Sensor events arrive at ~60 Hz; repaint at most every 40 ms.
   const now = performance.now();
   if (now - lastLeanPaint < 40) return;
@@ -199,12 +268,15 @@ async function calibrate() {
   const ok = await requestMotion(true);
   if (!ok) return;
   $('btnCal').classList.add('busy'); $('btnCal').textContent = t('calibrating');
+  S.stats.maxLeanL = 0; S.stats.maxLeanR = 0; paintLeanMax(); // a new reference invalidates earlier maxes
   S.lean.startCalibration(1200);
 }
 S.lean.onCalibrated = cal => {
   saveCalibration(cal);
-  $('btnCal').classList.remove('busy'); $('btnCal').textContent = t('cal');
-  toast(t('calibrated'));
+  if ($('btnCal').classList.contains('busy')) {
+    $('btnCal').classList.remove('busy'); $('btnCal').textContent = t('cal');
+    toast(t('calibrated'));
+  }
 };
 
 // ---------------- Session ----------------
@@ -280,6 +352,7 @@ function setDemo(on) {
     S.sim = new RideSimulator(c);
     S.sim.onFix = onFix;
     S.sim.onLean = applyLean;
+    S.sim.onMotion = accumulateMotion;
     S.sim.start();
     $('sensorOverlay').classList.add('hidden');
     $('gpsStatus').textContent = 'DEMO'; $('gpsStatus').classList.add('warn');
@@ -559,6 +632,80 @@ function openDetail(s) {
   setTimeout(() => { S.detailMap.invalidateSize(); if (pts.length) S.detailMap.fitBounds(S.detailTrack.getBounds(), { padding: [20, 20] }); }, 80);
 }
 $('btnDetailShare').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
+$('btnDetailAnalytics').addEventListener('click', () => S.detailSession && openAnalytics(S.detailSession));
+
+// ---------------- Analytics ----------------
+const CHANNEL_DEFS = [
+  { key: 'speed', name: 'chSpeed', color: '#f3f3f6', on: true },
+  { key: 'lean', name: 'chLean', unit: '°', color: '#e9e94a', on: true, symmetric: true },
+  { key: 'ax', name: 'chLong', unit: 'm/s²', color: '#35e07a', on: true, symmetric: true },
+  { key: 'ay', name: 'chLat', unit: 'm/s²', color: '#3aa0ff', on: true, symmetric: true },
+  { key: 'az', name: 'chVert', unit: 'm/s²', color: '#a970ff', on: false, imu: true },
+  { key: 'gx', name: 'chRoll', unit: '°/s', color: '#ff7b1c', on: false, imu: true, symmetric: true },
+  { key: 'gy', name: 'chPitch', unit: '°/s', color: '#ff4d4d', on: false, imu: true, symmetric: true },
+  { key: 'gz', name: 'chYaw', unit: '°/s', color: '#ffd23a', on: false, imu: true, symmetric: true },
+];
+let chart = null, anData = null;
+const anOn = new Set(CHANNEL_DEFS.filter(c => c.on).map(c => c.key));
+
+// Per-channel arrays for a session: from the 5 Hz IMU samples when present, else derived from the GPS track.
+function analyticsData(s) {
+  const spd = v => v * (imperial() ? 2.23694 : 3.6);
+  const out = { t: [], speed: [], lean: [], ax: [], ay: [], az: [], gx: [], gy: [], gz: [], imu: s.samplesSource === 'imu' && s.samples?.length > 0 };
+  if (s.samples && s.samples.length) {
+    const aS = s.accelSign || 1, gS = s.gyroSign || 1;
+    const sg = (v, k) => v == null ? null : v * k;
+    for (const r of s.samples) {
+      out.t.push(r[0] / 1000); out.speed.push(spd(r[1] || 0)); out.lean.push(r[2]);
+      if (out.imu) {
+        out.ax.push(sg(r[3], aS)); out.ay.push(sg(r[4], aS)); out.az.push(sg(r[5], aS));
+        out.gx.push(sg(r[6], gS)); out.gy.push(sg(r[7], gS)); out.gz.push(sg(r[8], gS));
+      }
+    }
+  }
+  // Speed comes from the 1 Hz GPS fixes themselves (a smooth line rather than a 5 Hz staircase).
+  if (s.track && s.track.length) { out.speedT = s.track.map(p => (p[0] - s.startTime) / 1000); out.speed = s.track.map(p => spd(p[3])); }
+  if (!out.imu) {
+    // GPS fallback: accel from the speed derivative, lateral accel from the balanced-turn relation g·tan(lean)
+    if (!out.t.length) for (const p of s.track) { out.t.push((p[0] - s.startTime) / 1000); out.lean.push(p[4]); }
+    if (!out.speedT) { out.speedT = out.t; }
+    const spdAt = i => { const k = lowerBound(out.speedT, out.t[i]); return out.speed[Math.min(out.speed.length - 1, k)] || 0; };
+    const toMs = imperial() ? 1 / 2.23694 : 1 / 3.6;
+    out.ax = []; out.ay = [];
+    for (let i = 0; i < out.t.length; i++) {
+      const j = Math.max(0, i - 1), k = Math.min(out.t.length - 1, i + 1), dt = out.t[k] - out.t[j];
+      out.ax.push(dt > 0 ? (spdAt(k) - spdAt(j)) * toMs / dt : 0);
+      out.ay.push(9.81 * Math.tan(Math.max(-60, Math.min(60, out.lean[i])) * Math.PI / 180));
+    }
+  }
+  return out;
+}
+function anChannels() {
+  return CHANNEL_DEFS.filter(c => anOn.has(c.key) && (!c.imu || anData.imu))
+    .map(c => ({ key: c.key, name: t(c.name), unit: c.key === 'speed' ? speedUnit() : c.unit, color: c.color, symmetric: !!c.symmetric,
+      t: c.key === 'speed' && anData.speedT ? anData.speedT : anData.t, v: anData[c.key] }));
+}
+function openAnalytics(s) {
+  anData = analyticsData(s);
+  $('anTitle').textContent = fmtDate(s.startTime);
+  $('anSource').textContent = anData.imu ? t('srcImu') : t('srcGps');
+  const chips = $('anChips'); chips.innerHTML = '';
+  for (const c of CHANNEL_DEFS) {
+    if (c.imu && !anData.imu) continue;
+    const b = document.createElement('button'); b.className = 'chip' + (anOn.has(c.key) ? ' on' : ''); b.style.setProperty('--chip', c.color);
+    b.textContent = t(c.name);
+    b.addEventListener('click', () => {
+      if (anOn.has(c.key)) { if (anOn.size > 1) anOn.delete(c.key); } else anOn.add(c.key);
+      b.classList.toggle('on', anOn.has(c.key)); chart.setChannels(anChannels());
+    });
+    chips.appendChild(b);
+  }
+  openSheet('sheetAnalytics');
+  const dur = Math.max(1, anData.t.length ? anData.t[anData.t.length - 1] : s.duration);
+  if (!chart) chart = createChart($('anCanvas'), { channels: anChannels(), duration: dur });
+  else chart.setData(anChannels(), dur);
+  setTimeout(() => chart.render(), 60);
+}
 $('btnDetailGpx').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
 $('btnDetailDelete').addEventListener('click', async () => {
   if (!S.detailSession || !await confirmSheet(t('deleteConfirm', { n: 1 }), t('yesDelete'))) return;
@@ -650,7 +797,8 @@ function init() {
   });
   const cal = loadCalibration();
   S.lean.setMount(S.settings.mount);
-  if (cal && cal.mount === S.settings.mount) S.lean.restore(cal);
+  if (cal && cal.mount === S.settings.mount) { S.lean.restore(cal); S.lean.setScreenAngle(currentScreenAngle()); }
+  else S.lean.setScreenAngle(currentScreenAngle());
   applySettings({ ...S.settings });
   if (S.settings.demo) setDemo(true);
   else {

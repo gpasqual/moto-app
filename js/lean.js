@@ -44,6 +44,16 @@ const FORWARD_RAW = {
   bag: [0, 1, 0],
 };
 
+// A road bike cannot lean beyond this; larger readings are handling / mount artefacts.
+export const MAX_VALID_LEAN = 70;
+
+// Rotate a phone-frame vector about the screen normal (z) by `deg`.
+function rotZ(v, deg) {
+  const a = deg * RAD, c = Math.cos(a), s = Math.sin(a);
+  return [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]];
+}
+const normAngle = a => ((a % 360) + 360) % 360;
+
 export class LeanEstimator {
   constructor() {
     this.mount = 'bars';
@@ -53,7 +63,14 @@ export class LeanEstimator {
     this.cal = null;          // { g0, f, r }
     this.calSamples = null;   // accumulating during calibration
     this.angle = 0;           // degrees, +right / -left
+    this.valid = true;        // false while |angle| exceeds MAX_VALID_LEAN
     this.hasData = false;
+    // Screen orientation handling. Sensor axes are fixed to the phone's natural (portrait) frame, so
+    // turning the phone to landscape looks like a 90° roll (bars mount) or swings the forward axis
+    // (tank mount). We track the screen angle and rotate the calibration frame to match.
+    this.screenAngle = 0;     // current screen.orientation.angle (0/90/180/270)
+    this.axisRot = 0;         // rotation applied to the mount's forward axis, degrees about z
+    this.pendingScreenAngle = null;
   }
 
   setMount(mount) {
@@ -62,25 +79,55 @@ export class LeanEstimator {
   }
   setInvert(v) { this.invert = !!v; }
 
-  // Restore a saved calibration ({ g0: [x,y,z], mount }).
+  // Restore a saved calibration ({ g0, axisRot, screenAngle, mount }).
   restore(saved) {
     if (!saved || !Array.isArray(saved.g0)) return false;
+    this.axisRot = saved.axisRot || 0;
+    this.screenAngle = saved.screenAngle || 0;
     this._deriveAxes(norm(saved.g0));
     return true;
   }
-  exportCalibration() { return this.cal ? { g0: this.cal.g0, mount: this.mount, at: Date.now() } : null; }
+  exportCalibration() {
+    return this.cal ? { g0: this.cal.g0, axisRot: this.axisRot, screenAngle: this.screenAngle, mount: this.mount, at: Date.now() } : null;
+  }
 
   _deriveAxes(g0) {
-    const fRaw = FORWARD_RAW[this.mount];
+    const fRaw = rotZ(FORWARD_RAW[this.mount], this.axisRot);
     let f = sub(fRaw, scale(g0, dot(fRaw, g0)));
     if (Math.hypot(...f) < 0.05) {
       // Degenerate: chosen forward axis is nearly vertical for this phone pose. Fall back to the other axis.
-      const alt = this.mount === 'bars' ? [0, 1, 0] : [0, 0, -1];
+      const alt = rotZ(this.mount === 'bars' ? [0, 1, 0] : [0, 0, -1], this.axisRot);
       f = sub(alt, scale(g0, dot(alt, g0)));
     }
     f = norm(f);
     const r = cross(g0, f); // right-hand lateral axis: leaning toward r is positive (right)
     this.cal = { g0, f, r };
+  }
+
+  // The screen rotated (or the app started at a different orientation than the saved calibration).
+  // Returns the rotation applied (degrees about z), or 0.
+  setScreenAngle(angle) {
+    angle = normAngle(Math.round(angle / 90) * 90);
+    if (angle === this.screenAngle) { this.pendingScreenAngle = null; return 0; }
+    if (!this.cal) { this.axisRot = -angle; this.screenAngle = angle; return 0; }
+    if (!this.filtered) { this.pendingScreenAngle = angle; return 0; } // no sample yet: apply on first update()
+    this.pendingScreenAngle = null;
+    // Screen Orientation API: angle grows counter-clockwise, i.e. the phone was turned the other way.
+    let delta = normAngle(angle - this.screenAngle); if (delta === 270) delta = -90;
+    let rot = -delta;
+    // Prefer what gravity says: which 90° step maps the old reference onto the current down vector?
+    // Only decisive when the phone is not lying flat (rotating a flat phone about z leaves gravity unchanged).
+    const g0 = this.cal.g0, g = this.filtered;
+    if (Math.hypot(g0[0], g0[1]) > 0.3) {
+      const cands = [90, -90, 180].map(d => { const v = rotZ(g0, d); return { d, err: Math.hypot(v[0] - g[0], v[1] - g[1], v[2] - g[2]) }; })
+        .sort((a, b) => a.err - b.err);
+      if (cands[0].err < 0.6 * cands[1].err) rot = cands[0].d;
+    }
+    this.axisRot += rot;
+    this.screenAngle = angle;
+    this._deriveAxes(rotZ(g0, rot));
+    this.onCalibrated && this.onCalibrated(this.exportCalibration());
+    return rot;
   }
 
   // Begin a calibration: average the next `ms` of samples, then lock in.
@@ -108,20 +155,23 @@ export class LeanEstimator {
       const c = this.calSamples;
       c.sum[0] += d[0]; c.sum[1] += d[1]; c.sum[2] += d[2]; c.n++;
       if (performance.now() >= c.until && c.n > 0) {
+        this.axisRot = -this.screenAngle; // fresh reference in the current screen orientation
         this._deriveAxes(norm(c.sum));
         this.calSamples = null;
+        this.pendingScreenAngle = null;
         this.onCalibrated && this.onCalibrated(this.exportCalibration());
       }
     }
 
     if (!this.cal) return null;
+    if (this.pendingScreenAngle != null) this.setScreenAngle(this.pendingScreenAngle);
     const { g0, f, r } = this.cal;
     const g = this.filtered;
     const gPerp = sub(g, scale(f, dot(g, f)));
     let ang = Math.atan2(dot(gPerp, r), dot(gPerp, g0)) * DEG;
     if (this.invert) ang = -ang;
-    // Guard against wild values from a bad calibration; a bike never exceeds ~65° on the road.
     if (!Number.isFinite(ang)) ang = 0;
+    this.valid = Math.abs(ang) <= MAX_VALID_LEAN;
     this.angle = ang;
     return ang;
   }

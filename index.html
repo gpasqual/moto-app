@@ -222,10 +222,21 @@
     <div class="sheet-scroll">
       <div id="detailMap" class="detail-map"></div>
       <div class="detail-grid" id="detailGrid"></div>
+      <button class="big-btn accent" id="btnDetailAnalytics" data-i18n="analytics">Analytics</button>
       <button class="big-btn" id="btnDetailGpx" data-i18n="exportGpx">Export GPX</button>
       <button class="big-btn danger" id="btnDetailDelete" data-i18n="delete">Delete</button>
       <div style="height:40px"></div>
     </div>
+  </div>
+</div>
+
+<!-- ===== Analytics ===== -->
+<div id="sheetAnalytics" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><button class="link-btn" data-close data-i18n="back">Back</button><h2 id="anTitle" data-i18n="analytics">Analytics</h2><span class="an-src" id="anSource"></span></div>
+    <div class="chips" id="anChips"></div>
+    <div class="an-chart"><canvas id="anCanvas"></canvas></div>
+    <div class="an-hint" data-i18n="anHint">Drag to pan · pinch or scroll to zoom · tap for values · double-tap to reset</div>
   </div>
 </div>
 

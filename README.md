@@ -10,7 +10,9 @@ Live at **https://gpasqual.github.io/moto-app/**. Dashboard design inspired by t
 - Map with heading arrow, track of the current session, follow / free-look, full-screen mode
 
 **Features**
-- Session recording (▶ / ■) with history, per-session detail map, GPX export/share, multi-select delete
+- Session recording (▶ / ■ with Save / Discard) with history, per-session detail map, GPX export/share, multi-select delete
+- Analytics per session: interactive time-history chart (drag / pinch / tap cursor) of speed, lean, accelerometer
+  (longitudinal, lateral, vertical) and gyro (roll, pitch, yaw rate) in bike axes, sampled at 5 Hz
 - Navigator: destination search, route with avoid tolls / motorways / ferries, turn-by-turn banner
   with voice announcements, re-routing, ETA + remaining, favourites, nearby fuel/food/hotels/parking, GPX import
 - Settings: panel colour, phone mount position, invert L/R, language (EN/IT), km/h / mph,
@@ -77,11 +79,17 @@ Open in Chrome → menu → **Install app** (or "Add to Home screen").
 | Ø AVG | distance ÷ moving time (time with speed > 3.6 km/h) |
 | MAX ACC / MAX BRAKE | derivative of GPS speed, 2-sample smoothed, glitches > 15 m/s² rejected |
 | BRAKE DIST | distance covered during the hardest braking event (decel ≥ 1 m/s² until it eases below 0.3 m/s²) |
-| Lean | sensor-fused device attitude (gyro+accel) → world-down vector in phone axes → signed roll about the bike's forward axis relative to the CAL reference. Right = positive. |
+| Lean | sensor-fused device attitude (gyro+accel) → world-down vector in phone axes → signed roll about the bike's forward axis relative to the CAL reference. Right = positive. Readings beyond 70° are treated as handling artefacts and never feed the maxes. |
+| Analytics IMU | `devicemotion` acceleration and rotation rate projected onto the calibrated bike axes, averaged to 5 Hz. The platform sign convention is learned per session by correlating IMU longitudinal accel with the GPS speed derivative (and roll rate with d(lean)/dt). |
 
 Lean uses the phone's fused attitude rather than the raw accelerometer, because in a balanced corner the raw
 accelerometer points along the bike and would read ~0°. Very long sustained corners can still drift a few degrees
-toward zero — that is a limit of phone sensors, not the maths.
+toward zero — that is a limit of phone sensors, not the maths. Braking/acceleration act in the pitch plane, which the
+roll calculation projects out, so they do not affect lean.
+
+Turning the phone portrait ↔ landscape looks like a 90° roll to the sensors; the app listens for screen-orientation
+changes and rotates the calibration frame to match (direction confirmed against the gravity vector), so a landscape
+mount works without re-calibrating. CAL resets the session lean maxes; an orientation change rolls them back 2 s.
 
 ## 4. Project layout
 
@@ -92,6 +100,7 @@ js/app.js               controller: GPS, sensors, session lifecycle, UI, setting
 js/telemetry.js         Session stats from GPS fixes; RideSimulator for demo mode
 js/lean.js              LeanEstimator (orientation → lean angle, calibration, mount handling)
 js/gauge.js             SVG lean dial
+js/chart.js             touch time-history chart for the analytics sheet
 js/map.js               Leaflet wrapper (position, track, route, POIs, light/dark)
 js/nav.js               Nominatim geocoding, OSRM routing, guidance + voice, Overpass POIs, GPX
 js/storage.js           settings/favourites (localStorage), sessions (IndexedDB)
