@@ -39,7 +39,7 @@ const STRINGS = {
     sessionDetail: 'Session', duration: 'Duration', distance: 'Distance', movingTime: 'Moving time',
     exportGpx: 'Export GPX', analytics: 'Analytics',
     chSpeed: 'Speed', chLean: 'Lean', chLong: 'Long. accel', chLat: 'Lat. accel', chVert: 'Vert. accel', chRoll: 'Roll rate', chPitch: 'Pitch rate', chYaw: 'Yaw rate',
-    anHint: 'Drag to pan · pinch or scroll to zoom · tap for values · double-tap to reset', srcImu: 'IMU 5 Hz', srcGps: 'GPS-derived',
+    anHint: 'Drag to pan · pinch or scroll to zoom · tap for values · double-tap to reset', srcImu: 'IMU {n} Hz', srcGps: 'GPS-derived', smoothing: 'Smoothing', raw: 'Raw',
     // Navigator
     searchDest: 'Search destination…', searching: 'Searching…', noResults: 'No results.',
     enterDest: 'Enter a destination to calculate a route.',
@@ -102,7 +102,7 @@ const STRINGS = {
     sessionDetail: 'Sessione', duration: 'Durata', distance: 'Distanza', movingTime: 'Tempo in movimento',
     exportGpx: 'Esporta GPX', analytics: 'Analisi',
     chSpeed: 'Velocità', chLean: 'Piega', chLong: 'Acc. longitudinale', chLat: 'Acc. laterale', chVert: 'Acc. verticale', chRoll: 'Vel. rollio', chPitch: 'Vel. beccheggio', chYaw: 'Vel. imbardata',
-    anHint: 'Trascina per spostare · pizzica o scorri per zoomare · tocca per i valori · doppio tocco per reimpostare', srcImu: 'IMU 5 Hz', srcGps: 'derivato da GPS',
+    anHint: 'Trascina per spostare · pizzica o scorri per zoomare · tocca per i valori · doppio tocco per reimpostare', srcImu: 'IMU {n} Hz', srcGps: 'derivato da GPS', smoothing: 'Media mobile', raw: 'Grezzo',
     searchDest: 'Cerca destinazione…', searching: 'Ricerca…', noResults: 'Nessun risultato.',
     enterDest: 'Inserisci una destinazione per calcolare il percorso.',
     avoidTolls: 'Evita pedaggi', avoidTollsSub: 'Evita strade con casello',

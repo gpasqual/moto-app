@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   avoidTolls: false,
   avoidMotorways: false,
   avoidFerries: false,
+  anSmooth: 0.2,            // analytics smoothing window, seconds (0 = raw)
 };
 
 function readJson(key, fallback) {
@@ -39,20 +40,24 @@ export function loadCalibration() { return readJson(CAL_KEY, null); }
 export function saveCalibration(cal) { writeJson(CAL_KEY, cal); }
 
 // ---- IndexedDB sessions ----
+// 'sessions' holds summaries + the 1 Hz GPS track (small, loaded for the history list).
+// 'imu' holds the raw sensor log per session (tens of MB per hour), loaded only for analytics.
 const DB_NAME = 'motospeed';
 const STORE = 'sessions';
+const IMU_STORE = 'imu';
 let dbPromise = null;
 
 function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) {
         const os = db.createObjectStore(STORE, { keyPath: 'id' });
         os.createIndex('startTime', 'startTime');
       }
+      if (!db.objectStoreNames.contains(IMU_STORE)) db.createObjectStore(IMU_STORE, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -60,22 +65,28 @@ function openDb() {
   return dbPromise;
 }
 
-function tx(mode, fn) {
+function tx(stores, mode, fn) {
   return openDb().then(db => new Promise((resolve, reject) => {
-    const t = db.transaction(STORE, mode);
-    const store = t.objectStore(STORE);
+    const t = db.transaction(stores, mode);
     let result;
-    try { result = fn(store); } catch (e) { reject(e); return; }
+    try { result = fn(...stores.map(n => t.objectStore(n))); } catch (e) { reject(e); return; }
     t.oncomplete = () => resolve(result && 'result' in result ? result.result : result);
     t.onerror = () => reject(t.error);
   }));
 }
 
-export function saveSession(session) { return tx('readwrite', s => s.put(session)); }
-export function deleteSession(id) { return tx('readwrite', s => s.delete(id)); }
-export function clearSessions() { return tx('readwrite', s => s.clear()); }
-export function getSession(id) { return tx('readonly', s => s.get(id)); }
+export function saveSession(session) {
+  const { imu, ...summary } = session;
+  return tx([STORE, IMU_STORE], 'readwrite', (s, m) => {
+    s.put(summary);
+    if (imu) m.put({ id: session.id, ...imu }); else m.delete(session.id);
+  });
+}
+export function deleteSession(id) { return tx([STORE, IMU_STORE], 'readwrite', (s, m) => { s.delete(id); m.delete(id); }); }
+export function clearSessions() { return tx([STORE, IMU_STORE], 'readwrite', (s, m) => { s.clear(); m.clear(); }); }
+export function getSession(id) { return tx([STORE], 'readonly', s => s.get(id)); }
+export function getImu(id) { return tx([IMU_STORE], 'readonly', m => m.get(id)); }
 export function listSessions() {
   // Newest first. Tracks are included; the list view only reads summary fields.
-  return tx('readonly', s => s.getAll()).then(all => (all || []).sort((a, b) => b.startTime - a.startTime));
+  return tx([STORE], 'readonly', s => s.getAll()).then(all => (all || []).sort((a, b) => b.startTime - a.startTime));
 }

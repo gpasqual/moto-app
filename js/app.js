@@ -1,5 +1,5 @@
 import { t, setLang, getLang, applyDom, aboutContent } from './i18n.js';
-import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibration, saveCalibration, saveSession, deleteSession, clearSessions, listSessions, getSession } from './storage.js';
+import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibration, saveCalibration, saveSession, deleteSession, clearSessions, listSessions, getSession, getImu } from './storage.js';
 import { LeanEstimator, leanInFrame } from './lean.js';
 import { Session, RideSimulator, haversine } from './telemetry.js';
 import { createGauge } from './gauge.js';
@@ -7,7 +7,7 @@ import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.2.1';
+export const VERSION = '1.3.0';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -204,11 +204,9 @@ function paintLeanMax() {
   $('leanR').textContent = `${Math.round(S.stats.maxLeanR)}°`;
 }
 
-// ---- Motion sampling (accelerometer + gyro projected into bike axes, averaged to 5 Hz while recording)
-const motionWin = { a: [0, 0, 0], w: [0, 0, 0], nA: 0, nW: 0 };
-function accumulateMotion(a, w) {
-  if (a) { motionWin.a[0] += a[0]; motionWin.a[1] += a[1]; motionWin.a[2] += a[2]; motionWin.nA++; }
-  if (w) { motionWin.w[0] += w[0]; motionWin.w[1] += w[1]; motionWin.w[2] += w[2]; motionWin.nW++; }
+// ---- Motion logging (accelerometer + gyro projected into bike axes, every event, while recording)
+function logMotion(a, w) {
+  if (S.recording) S.stats.addMotion(Date.now(), S.stats.currentLean, a, w);
 }
 function onDeviceMotion(e) {
   if (S.settings.demo || !S.recording || !S.lean.cal) return;
@@ -225,16 +223,8 @@ function onDeviceMotion(e) {
     const v = [rr.beta, rr.gamma, rr.alpha]; // rates about phone x, y, z
     w = [dot(v, f), dot(v, r), -dot(v, g0)]; // roll, pitch, yaw
   }
-  accumulateMotion(a, w);
+  logMotion(a, w);
 }
-setInterval(() => {
-  if (!S.recording) { motionWin.nA = motionWin.nW = 0; motionWin.a = [0, 0, 0]; motionWin.w = [0, 0, 0]; return; }
-  const a = motionWin.nA ? motionWin.a.map(x => x / motionWin.nA) : null;
-  const w = motionWin.nW ? motionWin.w.map(x => x / motionWin.nW) : null;
-  motionWin.a = [0, 0, 0]; motionWin.w = [0, 0, 0]; motionWin.nA = motionWin.nW = 0;
-  const speed = S.lastFix && S.lastFix.speed > 0 ? S.lastFix.speed : 0;
-  S.stats.addSample(Date.now(), speed, S.stats.currentLean, a, w);
-}, 200);
 
 let lastLeanPaint = 0;
 function onOrientation(e) {
@@ -368,7 +358,7 @@ function setDemo(on) {
     S.sim = new RideSimulator(c);
     S.sim.onFix = onFix;
     S.sim.onLean = applyLean;
-    S.sim.onMotion = accumulateMotion;
+    S.sim.onMotion = logMotion;
     S.sim.start();
     $('sensorOverlay').classList.add('hidden');
     $('gpsStatus').textContent = 'DEMO'; $('gpsStatus').classList.add('warn');
@@ -661,50 +651,79 @@ const CHANNEL_DEFS = [
   { key: 'gy', name: 'chPitch', unit: '°/s', color: '#ff4d4d', on: false, imu: true, symmetric: true },
   { key: 'gz', name: 'chYaw', unit: '°/s', color: '#ffd23a', on: false, imu: true, symmetric: true },
 ];
+const SMOOTH_STEPS = [0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3]; // seconds; 0 = raw
 let chart = null, anData = null;
 const anOn = new Set(CHANNEL_DEFS.filter(c => c.on).map(c => c.key));
 
-// Per-channel arrays for a session: from the 5 Hz IMU samples when present, else derived from the GPS track.
-function analyticsData(s) {
-  const spd = v => v * (imperial() ? 2.23694 : 3.6);
-  const out = { t: [], speed: [], lean: [], ax: [], ay: [], az: [], gx: [], gy: [], gz: [], imu: s.samplesSource === 'imu' && s.samples?.length > 0 };
-  if (s.samples && s.samples.length) {
-    const aS = s.accelSign || 1, gS = s.gyroSign || 1;
-    const sg = (v, k) => v == null ? null : v * k;
-    for (const r of s.samples) {
-      out.t.push(r[0] / 1000); out.speed.push(spd(r[1] || 0)); out.lean.push(r[2]);
-      if (out.imu) {
-        out.ax.push(sg(r[3], aS)); out.ay.push(sg(r[4], aS)); out.az.push(sg(r[5], aS));
-        out.gx.push(sg(r[6], gS)); out.gy.push(sg(r[7], gS)); out.gz.push(sg(r[8], gS));
-      }
-    }
+// Centred moving average over `win` seconds; NaN gaps are skipped. Assumes roughly uniform sampling.
+function smooth(t, v, win) {
+  const n = v.length;
+  if (!win || n < 3) return v;
+  const rate = (n - 1) / Math.max(1e-3, t[n - 1] - t[0]);
+  const k = Math.round(win * rate);
+  if (k < 2) return v;
+  const half = k >> 1, out = new Float32Array(n);
+  let sum = 0, cnt = 0, lo = 0, hi = -1; // window [lo, hi]
+  for (let i = 0; i < n; i++) {
+    const wantHi = Math.min(n - 1, i + half), wantLo = Math.max(0, i - half);
+    while (hi < wantHi) { hi++; const x = v[hi]; if (Number.isFinite(x)) { sum += x; cnt++; } }
+    while (lo < wantLo) { const x = v[lo]; if (Number.isFinite(x)) { sum -= x; cnt--; } lo++; }
+    out[i] = cnt ? sum / cnt : NaN;
   }
-  // Speed comes from the 1 Hz GPS fixes themselves (a smooth line rather than a 5 Hz staircase).
-  if (s.track && s.track.length) { out.speedT = s.track.map(p => (p[0] - s.startTime) / 1000); out.speed = s.track.map(p => spd(p[3])); }
+  return out;
+}
+
+// Normalise a session's data into raw per-channel arrays (seconds / values), whatever its vintage:
+//   imu (native-rate Float32 columns) > samples (5 Hz rows, v1.2.0) > GPS track (derived)
+async function analyticsData(s) {
+  const spdF = imperial() ? 2.23694 : 3.6;
+  const out = { t: null, imu: false, rate: 0, ch: {} };
+  const aS = s.accelSign || 1, gS = s.gyroSign || 1;
+  const scaled = (arr, k) => { const o = new Float32Array(arr.length); for (let i = 0; i < arr.length; i++) o[i] = arr[i] * k; return o; };
+  let imu = null;
+  if (s.samplesSource === 'imu' && s.imuCount) { try { imu = await getImu(s.id); } catch { /* fall through */ } }
+  if (imu && imu.t && imu.t.length) {
+    out.imu = true; out.rate = imu.rate || imu.t.length / Math.max(1, (imu.t[imu.t.length - 1] - imu.t[0]) / 1000);
+    out.t = scaled(imu.t, 0.001);
+    out.ch = { lean: imu.lean, ax: scaled(imu.ax, aS), ay: scaled(imu.ay, aS), az: scaled(imu.az, aS), gx: scaled(imu.gx, gS), gy: scaled(imu.gy, gS), gz: scaled(imu.gz, gS) };
+  } else if (s.samples && s.samples.length) {
+    out.imu = s.samplesSource === 'imu'; out.rate = 5;
+    const col = (i, k = 1) => Float32Array.from(s.samples, r => r[i] == null ? NaN : r[i] * k);
+    out.t = Float32Array.from(s.samples, r => r[0] / 1000);
+    out.ch = { lean: col(2), ax: col(3, aS), ay: col(4, aS), az: col(5, aS), gx: col(6, gS), gy: col(7, gS), gz: col(8, gS) };
+  }
+  // Speed always from the 1 Hz GPS fixes
+  const trk = s.track || [];
+  out.speedT = Float32Array.from(trk, p => (p[0] - s.startTime) / 1000);
+  out.ch.speed = Float32Array.from(trk, p => p[3] * spdF);
   if (!out.imu) {
     // GPS fallback: accel from the speed derivative, lateral accel from the balanced-turn relation g·tan(lean)
-    if (!out.t.length) for (const p of s.track) { out.t.push((p[0] - s.startTime) / 1000); out.lean.push(p[4]); }
-    if (!out.speedT) { out.speedT = out.t; }
-    const spdAt = i => { const k = lowerBound(out.speedT, out.t[i]); return out.speed[Math.min(out.speed.length - 1, k)] || 0; };
-    const toMs = imperial() ? 1 / 2.23694 : 1 / 3.6;
-    out.ax = []; out.ay = [];
-    for (let i = 0; i < out.t.length; i++) {
-      const j = Math.max(0, i - 1), k = Math.min(out.t.length - 1, i + 1), dt = out.t[k] - out.t[j];
-      out.ax.push(dt > 0 ? (spdAt(k) - spdAt(j)) * toMs / dt : 0);
-      out.ay.push(9.81 * Math.tan(Math.max(-60, Math.min(60, out.lean[i])) * Math.PI / 180));
+    if (!out.t) { out.t = out.speedT; out.ch.lean = Float32Array.from(trk, p => p[4]); out.rate = 1; }
+    const n = out.t.length, ax = new Float32Array(n), ay = new Float32Array(n);
+    const spdAt = i => { const k = Math.min(trk.length - 1, lowerBound(out.speedT, out.t[i])); return trk.length ? trk[k][3] : 0; };
+    for (let i = 0; i < n; i++) {
+      const j = Math.max(0, i - 1), k = Math.min(n - 1, i + 1), dt = out.t[k] - out.t[j];
+      ax[i] = dt > 0 ? (spdAt(k) - spdAt(j)) / dt : 0;
+      ay[i] = 9.81 * Math.tan(Math.max(-60, Math.min(60, out.ch.lean[i])) * Math.PI / 180);
     }
+    out.ch.ax = ax; out.ch.ay = ay;
   }
   return out;
 }
 function anChannels() {
-  return CHANNEL_DEFS.filter(c => anOn.has(c.key) && (!c.imu || anData.imu))
-    .map(c => ({ key: c.key, name: t(c.name), unit: c.key === 'speed' ? speedUnit() : c.unit, color: c.color, symmetric: !!c.symmetric,
-      t: c.key === 'speed' && anData.speedT ? anData.speedT : anData.t, v: anData[c.key] }));
+  const win = S.settings.anSmooth || 0;
+  return CHANNEL_DEFS.filter(c => anOn.has(c.key) && (!c.imu || anData.imu) && anData.ch[c.key])
+    .map(c => {
+      const tt = c.key === 'speed' ? anData.speedT : anData.t;
+      return { key: c.key, name: t(c.name), unit: c.key === 'speed' ? speedUnit() : c.unit, color: c.color, symmetric: !!c.symmetric,
+        t: tt, v: smooth(tt, anData.ch[c.key], win) };
+    });
 }
-function openAnalytics(s) {
-  anData = analyticsData(s);
+function smoothLabel() { const w = S.settings.anSmooth || 0; return w ? `${w} s` : t('raw'); }
+async function openAnalytics(s) {
+  anData = await analyticsData(s);
   $('anTitle').textContent = fmtDate(s.startTime);
-  $('anSource').textContent = anData.imu ? t('srcImu') : t('srcGps');
+  $('anSource').textContent = anData.imu ? t('srcImu', { n: Math.round(anData.rate) }) : t('srcGps');
   const chips = $('anChips'); chips.innerHTML = '';
   for (const c of CHANNEL_DEFS) {
     if (c.imu && !anData.imu) continue;
@@ -716,12 +735,21 @@ function openAnalytics(s) {
     });
     chips.appendChild(b);
   }
+  const sl = $('anSmooth');
+  sl.max = SMOOTH_STEPS.length - 1;
+  let idx = SMOOTH_STEPS.indexOf(S.settings.anSmooth || 0); if (idx < 0) idx = 3;
+  sl.value = idx; $('anSmoothVal').textContent = smoothLabel();
   openSheet('sheetAnalytics');
   const dur = Math.max(1, anData.t.length ? anData.t[anData.t.length - 1] : s.duration);
   if (!chart) chart = createChart($('anCanvas'), { channels: anChannels(), duration: dur });
   else chart.setData(anChannels(), dur);
   setTimeout(() => chart.render(), 60);
 }
+$('anSmooth').addEventListener('input', e => {
+  S.settings.anSmooth = SMOOTH_STEPS[+e.target.value] || 0; saveSettings(S.settings);
+  $('anSmoothVal').textContent = smoothLabel();
+  if (chart && anData) chart.setChannels(anChannels());
+});
 $('btnDetailGpx').addEventListener('click', () => S.detailSession && exportGpx(S.detailSession));
 $('btnDetailDelete').addEventListener('click', async () => {
   if (!S.detailSession || !await confirmSheet(t('deleteConfirm', { n: 1 }), t('yesDelete'))) return;

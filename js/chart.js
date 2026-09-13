@@ -70,7 +70,7 @@ export function createChart(canvas, opts = {}) {
       // visible range
       const i0 = Math.max(0, lowerBound(c.t, view.t0) - 1), i1 = Math.min(c.t.length, lowerBound(c.t, view.t1) + 1);
       let mn = Infinity, mx = -Infinity;
-      for (let i = i0; i < i1; i++) { const v = c.v[i]; if (v == null) continue; if (v < mn) mn = v; if (v > mx) mx = v; }
+      for (let i = i0; i < i1; i++) { const v = c.v[i]; if (!Number.isFinite(v)) continue; if (v < mn) mn = v; if (v > mx) mx = v; }
       if (!Number.isFinite(mn)) { mn = -1; mx = 1; }
       if (c.symmetric) { const m = Math.max(Math.abs(mn), Math.abs(mx), 0.01); mn = -m; mx = m; }
       if (mx - mn < 1e-6) { mn -= 1; mx += 1; }
@@ -90,7 +90,7 @@ export function createChart(canvas, opts = {}) {
       if (samplesPerPx > 2) {
         let col = -1, cmin = 0, cmax = 0, started = false;
         for (let i = i0; i < i1; i++) {
-          const v = c.v[i]; if (v == null) continue;
+          const v = c.v[i]; if (!Number.isFinite(v)) continue;
           const x = Math.round(xOf(c.t[i]));
           if (x !== col) {
             if (col >= 0) { if (!started) { ctx.moveTo(col, yOf(cmax)); started = true; } ctx.lineTo(col, yOf(cmax)); ctx.lineTo(col, yOf(cmin)); }
@@ -102,7 +102,7 @@ export function createChart(canvas, opts = {}) {
         let pen = false;
         for (let i = i0; i < i1; i++) {
           const v = c.v[i];
-          if (v == null) { pen = false; continue; }
+          if (!Number.isFinite(v)) { pen = false; continue; }
           const x = xOf(c.t[i]), yy = yOf(v);
           if (!pen) { ctx.moveTo(x, yy); pen = true; } else ctx.lineTo(x, yy);
         }
@@ -126,7 +126,7 @@ export function createChart(canvas, opts = {}) {
       for (const s of strips) {
         const { c } = s;
         const i = nearestIndex(c.t, cursor);
-        if (i < 0 || c.v[i] == null) continue;
+        if (i < 0 || !Number.isFinite(c.v[i])) continue;
         const yy = s.yOf(c.v[i]);
         ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(xOf(c.t[i]), yy, 3.5, 0, Math.PI * 2); ctx.fill();
         const label = `${fmtNum(c.v[i])}${c.unit ? ' ' + c.unit : ''}`;

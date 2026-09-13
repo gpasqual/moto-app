@@ -12,7 +12,9 @@ Live at **https://gpasqual.github.io/moto-app/**. Dashboard design inspired by t
 **Features**
 - Session recording (▶ / ■ with Save / Discard) with history, per-session detail map, GPX export/share, multi-select delete
 - Analytics per session: interactive time-history chart (drag / pinch / tap cursor) of speed, lean, accelerometer
-  (longitudinal, lateral, vertical) and gyro (roll, pitch, yaw rate) in bike axes, sampled at 5 Hz
+  (longitudinal, lateral, vertical) and gyro (roll, pitch, yaw rate) in bike axes. The raw sensor stream is logged at
+  its native rate (~60 Hz on iPhone, ≈20 MB per hour); a Smoothing slider in the viewer applies a centred moving
+  average (Raw … 3 s) at draw time
 - Navigator: destination search, route with avoid tolls / motorways / ferries, turn-by-turn banner
   with voice announcements, re-routing, ETA + remaining, favourites, nearby fuel/food/hotels/parking, GPX import
 - Settings: panel colour, phone mount position, invert L/R, language (EN/IT), km/h / mph,
@@ -80,7 +82,7 @@ Open in Chrome → menu → **Install app** (or "Add to Home screen").
 | MAX ACC / MAX BRAKE | derivative of GPS speed, 2-sample smoothed, glitches > 15 m/s² rejected |
 | BRAKE DIST | distance covered during the hardest braking event (decel ≥ 1 m/s² until it eases below 0.3 m/s²) |
 | Lean | sensor-fused device attitude (gyro+accel) → world-down vector in phone axes → signed roll about the bike's forward axis relative to the CAL reference. Right = positive. Readings beyond 70° are treated as handling artefacts and never feed the maxes. |
-| Analytics IMU | `devicemotion` acceleration and rotation rate projected onto the calibrated bike axes, averaged to 5 Hz. The platform sign convention is learned per session by correlating IMU longitudinal accel with the GPS speed derivative (and roll rate with d(lean)/dt). |
+| Analytics IMU | every `devicemotion` event's acceleration and rotation rate projected onto the calibrated bike axes and stored raw (Float32 columns in a separate IndexedDB store, so the history list never loads them). The platform sign convention is learned per session by correlating IMU longitudinal accel with the GPS speed derivative (and roll rate with d(lean)/dt). Smoothing is applied only when viewing. |
 
 Lean uses the phone's fused attitude rather than the raw accelerometer, because in a balanced corner the raw
 accelerometer points along the bike and would read ~0°. Very long sustained corners can still drift a few degrees
@@ -105,7 +107,7 @@ js/gauge.js             SVG lean dial
 js/chart.js             touch time-history chart for the analytics sheet
 js/map.js               Leaflet wrapper (position, track, route, POIs, light/dark)
 js/nav.js               Nominatim geocoding, OSRM routing, guidance + voice, Overpass POIs, GPX
-js/storage.js           settings/favourites (localStorage), sessions (IndexedDB)
+js/storage.js           settings/favourites (localStorage), sessions + raw IMU logs (IndexedDB)
 js/i18n.js              EN / IT strings
 sw.js                   service worker (network-first app shell, offline fallback)
 manifest.webmanifest    PWA manifest; icons/ generated PNGs

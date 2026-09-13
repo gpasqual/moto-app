@@ -27,6 +27,16 @@ export function bearing(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Append-only typed-array buffer that doubles when full.
+class GrowBuf {
+  constructor(Type = Float32Array, cap = 8192) { this.Type = Type; this.a = new Type(cap); this.n = 0; }
+  push(v) {
+    if (this.n === this.a.length) { const b = new this.Type(this.a.length * 2); b.set(this.a); this.a = b; }
+    this.a[this.n++] = v;
+  }
+  trim() { return this.a.slice(0, this.n); }
+}
+
 export class Session {
   constructor() {
     this.id = `s_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
@@ -41,13 +51,15 @@ export class Session {
     this.maxLeanL = 0;       // deg
     this.maxLeanR = 0;       // deg
     this.track = [];         // [t, lat, lng, speed, lean, alt]
-    // 5 Hz time history for analytics: [t_ms since start, speed m/s, lean deg, ax, ay, az, gx, gy, gz]
-    // a* = accelerometer in bike axes (long/lat/vert, m/s²), g* = gyro (roll/pitch/yaw rate, deg/s); null when no IMU.
-    this.samples = [];
+    // Raw IMU log at the sensor's native rate (~60 Hz): per event t (ms since start), lean (deg), accelerometer in
+    // bike axes ax/ay/az (long/lat/vert, m/s²) and gyro gx/gy/gz (roll/pitch/yaw rate, deg/s). NaN where absent.
+    // Kept in growable Float32 columns; averaging happens in the analytics viewer, not here.
+    this._imu = { t: new GrowBuf(Uint32Array), lean: new GrowBuf(), ax: new GrowBuf(), ay: new GrowBuf(), az: new GrowBuf(), gx: new GrowBuf(), gy: new GrowBuf(), gz: new GrowBuf() };
+    this.imuCount = 0;
     this.samplesSource = 'gps';  // 'imu' once real motion data has been recorded
     // The platform's sign convention for accelerometer/gyro is not knowable up front (iOS and Android differ),
     // so we learn it: correlate IMU longitudinal accel with the GPS speed derivative, and roll rate with d(lean)/dt.
-    this._accCorr = 0; this._gyrCorr = 0; this._prevSampleLean = null;
+    this._accCorr = 0; this._gyrCorr = 0; this._prevMotionLean = null;
     this._last = null;       // last accepted fix {t, lat, lng, speed}
     this._prevSpeed = null;
     this._accel = 0;
@@ -60,16 +72,25 @@ export class Session {
   get accelSign() { return this._accCorr < 0 ? -1 : 1; }
   get gyroSign() { return this._gyrCorr < 0 ? -1 : 1; }
 
-  // One averaged 5 Hz row. a/w are bike-frame [long, lat, vert] / [roll, pitch, yaw] or null.
-  addSample(t, speed, lean, a, w) {
-    if (a) this.samplesSource = 'imu';
+  // One raw motion event. a/w are bike-frame [long, lat, vert] / [roll, pitch, yaw] or null.
+  addMotion(t, lean, a, w) {
+    if (!a && !w) return;
+    this.samplesSource = 'imu';
     if (a && Number.isFinite(this._accel)) this._accCorr += a[0] * this._accel;
-    if (w && this._prevSampleLean != null) this._gyrCorr += w[0] * (lean - this._prevSampleLean);
-    this._prevSampleLean = lean;
-    const r2 = v => v == null ? null : Math.round(v * 100) / 100;
-    this.samples.push([t - this.startTime, r2(speed), Math.round(lean * 10) / 10,
-      a ? r2(a[0]) : null, a ? r2(a[1]) : null, a ? r2(a[2]) : null,
-      w ? r2(w[0]) : null, w ? r2(w[1]) : null, w ? r2(w[2]) : null]);
+    if (w && this._prevMotionLean != null) this._gyrCorr += w[0] * (lean - this._prevMotionLean);
+    this._prevMotionLean = lean;
+    const m = this._imu;
+    m.t.push(Math.max(0, t - this.startTime)); m.lean.push(lean);
+    m.ax.push(a ? a[0] : NaN); m.ay.push(a ? a[1] : NaN); m.az.push(a ? a[2] : NaN);
+    m.gx.push(w ? w[0] : NaN); m.gy.push(w ? w[1] : NaN); m.gz.push(w ? w[2] : NaN);
+    this.imuCount++;
+  }
+  _exportImu() {
+    if (!this.imuCount) return null;
+    const m = this._imu, out = {};
+    for (const k of Object.keys(m)) out[k] = m[k].trim();
+    out.rate = this.imuCount / Math.max(1, (out.t[this.imuCount - 1] - out.t[0]) / 1000);
+    return out;
   }
   get avgSpeed() { return this.movingTime > 1 ? this.distance / this.movingTime : 0; }
   get accel() { return this._accel; }
@@ -138,7 +159,8 @@ export class Session {
       duration: this.elapsed, movingTime: this.movingTime, distance: this.distance,
       maxSpeed: this.maxSpeed, avgSpeed: this.avgSpeed, maxAccel: this.maxAccel, maxBrake: this.maxBrake,
       brakeDist: this.brakeDist, maxLeanL: this.maxLeanL, maxLeanR: this.maxLeanR, track: this.track,
-      samples: this.samples, samplesSource: this.samplesSource, accelSign: this.accelSign, gyroSign: this.gyroSign,
+      samplesSource: this.samplesSource, imuCount: this.imuCount, accelSign: this.accelSign, gyroSign: this.gyroSign,
+      imu: this._exportImu(),
     };
   }
 }
