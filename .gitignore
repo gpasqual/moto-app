@@ -1,0 +1,6 @@
+# Reference screenshots of the original app (kept local; repo is public)
+reference/
+iCloud Photos.zip
+# OS / editor noise
+.DS_Store
+Thumbs.db

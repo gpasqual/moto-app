@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>MOTO SPEED</title>
+  <meta name="description" content="Motorcycle dashboard: speed, lean angle, acceleration, braking, GPS map and navigation.">
+  <meta name="theme-color" content="#0a0a0c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MOTO SPEED">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="18" cy="12" r="2" fill="currentColor"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5M20 4l-6 6M4 20l6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M10 4v6H4M14 20v-6h6M4 4l6 6M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><path d="M21 3L3 10.5l8.5 2 2 8.5z" fill="currentColor"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-road" viewBox="0 0 24 24"><path d="M9 4L4 20M15 4l5 16M12 4v3M12 10v3M12 16v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16M13 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 13l4-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="13" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="currentColor"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3L2 21h20z" fill="currentColor"/><path d="M12 9v5M12 17v1.5" stroke="#0a0a0c" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-arrows-h" viewBox="0 0 24 24"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-turn-left" viewBox="0 0 24 24"><path d="M17 20V11a4 4 0 0 0-4-4H5M9 3L5 7l4 4" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-turn-right" viewBox="0 0 24 24"><path d="M7 20V11a4 4 0 0 1 4-4h8M15 3l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" opacity=".25"/><path d="M12 17V7M8 11l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2s0-2 1.5-2h1.5A4.5 4.5 0 0 0 21 12.5C21 7 17 3 12 3z" fill="currentColor"/><circle cx="7.5" cy="12" r="1.5" fill="#0a0a0c"/><circle cx="10" cy="7.5" r="1.5" fill="#0a0a0c"/><circle cx="14.5" cy="7.5" r="1.5" fill="#0a0a0c"/></symbol>
+    <symbol id="i-lean" viewBox="0 0 24 24"><path d="M4 20L18 6M4 20h16M4 20a8 8 0 0 1 8-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-nav" viewBox="0 0 24 24"><path d="M21 3L3 10.5l8.5 2 2 8.5z" fill="currentColor"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M16 8a5 5 0 0 1 0 8M18.5 5.5a8.5 8.5 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-moto" viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18.5" cy="16.5" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 16.5l4-7h4l2 3h3l-1-3h-2.5M8 9.5H6M13.5 9.5l2-2.5h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" fill="currentColor"/><circle cx="12" cy="10" r="2.6" fill="#0a0a0c"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.8L12 17.7 6 21l1.3-6.8-5-4.7 6.8-.8z" fill="currentColor"/></symbol>
+    <symbol id="i-gpx" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" fill="currentColor"/><path d="M9 4v14M15 6v14" stroke="#0a0a0c" stroke-width="1.6"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.6" fill="currentColor"/><circle cx="18" cy="18" r="2.6" fill="currentColor"/><path d="M6 8.5v3a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-fuel" viewBox="0 0 24 24"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 6h6v5H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 9h2l3 3v6a1.5 1.5 0 0 1-3 0v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-food" viewBox="0 0 24 24"><path d="M6 3v7a2 2 0 0 0 2 2v9M8 3v7M10 3v7M16 3c-2 0-3 2-3 5v3h3v10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bed" viewBox="0 0 24 24"><path d="M3 18V8M3 14h18v4M7 10h6a3 3 0 0 1 3 3v1M21 18v-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-parking" viewBox="0 0 24 24"><path d="M8 20V4h5.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-euro" viewBox="0 0 24 24"><path d="M17 6.5A6 6 0 0 0 7 12a6 6 0 0 0 10 5.5M4 10h9M4 14h9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-ferry" viewBox="0 0 24 24"><path d="M4 16l1.5 3h13L20 16M6 15V9h12v6M9 9V6h6v3M2 20c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="topbar">
+    <button id="btnStart" class="round-btn start" aria-label="Start"><svg><use href="#i-play"/></svg></button>
+    <div class="title">
+      <span data-i18n="appTitleA">MOTO</span>
+      <button id="btnReset" class="reset-btn" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>
+      <span data-i18n="appTitleB">SPEED</span>
+    </div>
+    <button id="btnMenu" class="round-btn menu" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+  </header>
+
+  <section class="map-panel" id="mapPanel">
+    <div id="map"></div>
+    <button id="btnSearch" class="map-btn tl" aria-label="Search"><svg><use href="#i-search"/></svg></button>
+    <div id="compass" class="compass"><div class="compass-dial"><span class="compass-n">N</span></div></div>
+    <button id="btnExpand" class="map-btn bl" aria-label="Expand"><svg class="ic-expand"><use href="#i-expand"/></svg><svg class="ic-collapse"><use href="#i-collapse"/></svg></button>
+    <button id="btnLocate" class="map-btn br" aria-label="Locate"><svg><use href="#i-locate"/></svg></button>
+    <div id="gpsStatus" class="gps-status"></div>
+    <div id="navBanner" class="nav-banner hidden">
+      <div class="nb-icon" id="nbIcon"></div>
+      <div class="nb-text"><div class="nb-dist" id="nbDist">--</div><div class="nb-instr" id="nbInstr"></div></div>
+      <button id="btnEndNav" class="nb-close" aria-label="End navigation"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div id="speedPill" class="speed-pill"><span id="pillSpeed">0</span><small id="pillUnit">km/h</small><em id="pillLean">0°</em></div>
+  </section>
+
+  <section class="nav-row">
+    <div class="nav-cell"><svg class="nav-ic"><use href="#i-clock"/></svg><div><div class="nav-val" id="nvTime">--</div><div class="nav-lbl" data-i18n="time">TIME</div></div></div>
+    <div class="nav-cell"><svg class="nav-ic"><use href="#i-nav"/></svg><div><div class="nav-val" id="nvEta">--:--</div><div class="nav-lbl" data-i18n="arrival">ARRIVAL</div></div></div>
+    <div class="nav-cell"><svg class="nav-ic"><use href="#i-road"/></svg><div><div class="nav-val" id="nvTotal">--</div><div class="nav-lbl" data-i18n="total">TOTAL</div></div></div>
+    <div class="nav-cell"><svg class="nav-ic"><use href="#i-arrow-right"/></svg><div><div class="nav-val" id="nvRemain">--</div><div class="nav-lbl" data-i18n="remaining">LEFT</div></div></div>
+  </section>
+
+  <section class="stats-grid">
+    <div class="panel speed-panel">
+      <div class="panel-label" data-i18n="speed">SPEED</div>
+      <div class="speed-value" id="speedVal">0</div>
+      <div class="speed-unit" id="speedUnit">km/h</div>
+      <div class="speed-max"><svg><use href="#i-up"/></svg><span data-i18n="max">MAX</span> <b id="speedMax">0</b></div>
+    </div>
+    <div class="stat-list">
+      <div class="panel stat-row"><svg class="stat-ic c-blue"><use href="#i-gauge"/></svg><span class="stat-lbl"><span data-i18n="avgSpeed">Ø AVG</span> <span class="u-speed">km/h</span></span><span class="stat-val" id="stAvg">0.0</span></div>
+      <div class="panel stat-row"><svg class="stat-ic c-green"><use href="#i-bolt"/></svg><span class="stat-lbl"><span data-i18n="maxAccel">MAX ACC</span> m/s²</span><span class="stat-val" id="stAcc">0.0</span></div>
+      <div class="panel stat-row"><svg class="stat-ic c-orange"><use href="#i-warn"/></svg><span class="stat-lbl"><span data-i18n="maxBrake">MAX BRAKE</span> m/s²</span><span class="stat-val" id="stBrake">0.0</span></div>
+      <div class="panel stat-row"><svg class="stat-ic c-yellow"><use href="#i-arrows-h"/></svg><span class="stat-lbl"><span data-i18n="brakeDist">BRAKE DIST</span> <span class="u-dist">m</span></span><span class="stat-val" id="stBrakeDist">0.0</span></div>
+    </div>
+  </section>
+
+  <section class="lean-row">
+    <div class="panel lean-side"><svg class="lean-ic"><use href="#i-turn-left"/></svg><div class="lean-val" id="leanL">0°</div></div>
+    <div class="panel lean-center">
+      <div id="gauge" class="gauge"></div>
+      <button id="btnCal" class="cal-btn" data-i18n="cal">CAL</button>
+      <button id="sensorOverlay" class="sensor-overlay hidden" data-i18n="enableSensors">Tap to enable lean sensor</button>
+    </div>
+    <div class="panel lean-side"><svg class="lean-ic"><use href="#i-turn-right"/></svg><div class="lean-val" id="leanR">0°</div></div>
+  </section>
+</div>
+
+<!-- ===== Menu action sheet ===== -->
+<div id="sheetMenu" class="sheet sheet-menu hidden">
+  <div class="sheet-backdrop" data-close></div>
+  <div class="sheet-body menu-body">
+    <button class="menu-item" id="miNav"><svg class="c-orange"><use href="#i-nav"/></svg><span data-i18n="navigator">Navigator</span></button>
+    <button class="menu-item" id="miHistory"><svg class="c-blue"><use href="#i-moto"/></svg><span data-i18n="history">Session history</span></button>
+    <button class="menu-item" id="miSettings"><svg class="c-muted"><use href="#i-menu"/></svg><span data-i18n="settings">Settings</span></button>
+    <button class="menu-item cancel" data-close><span data-i18n="cancel">Cancel</span></button>
+  </div>
+</div>
+
+<!-- ===== Settings ===== -->
+<div id="sheetSettings" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><span></span><h2 data-i18n="settings">Settings</h2><button class="link-btn" data-close data-i18n="done">Done</button></div>
+    <div class="sheet-scroll">
+      <div class="group-title"><svg class="c-orange"><use href="#i-palette"/></svg><span data-i18n="theme">THEME</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="panelColor">Panel color</span><select id="setAccent" class="sel">
+          <option value="orange" data-i18n="colorOrange">Orange</option><option value="red" data-i18n="colorRed">Red</option><option value="blue" data-i18n="colorBlue">Blue</option><option value="green" data-i18n="colorGreen">Green</option><option value="yellow" data-i18n="colorYellow">Yellow</option><option value="purple" data-i18n="colorPurple">Purple</option><option value="white" data-i18n="colorWhite">White</option>
+        </select></label>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-lean"/></svg><span data-i18n="leanSection">LEAN ANGLE</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="phonePos">Phone position</span><select id="setMount" class="sel">
+          <option value="frame" data-i18n="posFrame">Frame / Tank</option><option value="bars" data-i18n="posBars">Handlebar</option><option value="bag" data-i18n="posBag">Tank bag</option>
+        </select></label>
+        <div class="row-hint" id="mountHint"></div>
+        <label class="row"><span data-i18n="invertLean">Invert left/right</span><input type="checkbox" class="toggle" id="setInvert"></label>
+        <label class="row"><span data-i18n="autoCal">Auto-calibrate on first reading</span><input type="checkbox" class="toggle" id="setAutoCal"></label>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-globe"/></svg><span data-i18n="language">LANGUAGE</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="lang">Language</span><select id="setLang" class="sel"><option value="en">🇬🇧 English</option><option value="it">🇮🇹 Italiano</option></select></label>
+        <label class="row"><span data-i18n="unitSystem">Unit system</span><select id="setUnits" class="sel"><option value="metric" data-i18n="metric">Metric (km/h)</option><option value="imperial" data-i18n="imperial">Imperial (mph)</option></select></label>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-nav"/></svg><span data-i18n="navigation">NAVIGATION</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="voiceGuidance">Voice announcements</span><input type="checkbox" class="toggle" id="setVoice"></label>
+        <button class="row row-btn" id="btnTestVoice"><svg class="c-orange"><use href="#i-speaker"/></svg><span data-i18n="testVoice">Test co-pilot</span></button>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-map"/></svg><span data-i18n="mapSection">MAP</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="mapStyle">Map style</span><select id="setMapStyle" class="sel"><option value="light" data-i18n="mapLight">Light</option><option value="dark" data-i18n="mapDark">Dark</option></select></label>
+        <label class="row"><span data-i18n="mapFollow">Follow position</span><input type="checkbox" class="toggle" id="setFollow"></label>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-screen"/></svg><span data-i18n="display">DISPLAY</span></div>
+      <div class="group">
+        <label class="row"><span data-i18n="keepAwake">Keep screen on</span><input type="checkbox" class="toggle" id="setAwake"></label>
+        <label class="row"><span data-i18n="demoMode">Demo mode</span><input type="checkbox" class="toggle" id="setDemo"></label>
+        <div class="row-hint" data-i18n="demoHint"></div>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-db"/></svg><span data-i18n="data">DATA</span></div>
+      <div class="group">
+        <button class="row row-btn danger" id="btnClearHistory"><svg><use href="#i-trash"/></svg><span data-i18n="clearHistory">Delete all sessions</span></button>
+      </div>
+
+      <div class="group-title"><svg class="c-orange"><use href="#i-info"/></svg><span data-i18n="about">ABOUT</span></div>
+      <div class="group"><div class="row"><span data-i18n="version">Version</span><span class="muted" id="appVersion"></span></div></div>
+      <div style="height:40px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== History ===== -->
+<div id="sheetHistory" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><button class="link-btn" data-close data-i18n="close">Close</button><h2 data-i18n="history">Session history</h2><button class="link-btn" id="btnSelect" data-i18n="select">Select</button></div>
+    <div class="sheet-scroll" id="historyList"></div>
+    <div class="sheet-foot hidden" id="historyFoot"><button class="big-btn danger" id="btnDeleteSel">Delete</button></div>
+  </div>
+</div>
+
+<!-- ===== Session detail ===== -->
+<div id="sheetDetail" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><button class="link-btn" data-close data-i18n="back">Back</button><h2 id="detailTitle" data-i18n="sessionDetail">Session</h2><button class="link-btn" id="btnDetailShare"><svg class="btn-ic"><use href="#i-share"/></svg></button></div>
+    <div class="sheet-scroll">
+      <div id="detailMap" class="detail-map"></div>
+      <div class="detail-grid" id="detailGrid"></div>
+      <button class="big-btn" id="btnDetailGpx" data-i18n="exportGpx">Export GPX</button>
+      <button class="big-btn danger" id="btnDetailDelete" data-i18n="delete">Delete</button>
+      <div style="height:40px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Navigator ===== -->
+<div id="sheetNav" class="sheet sheet-full hidden">
+  <div class="sheet-body">
+    <div class="sheet-head"><button class="link-btn" data-close data-i18n="cancel">Cancel</button><h2 class="mono" data-i18n="navigator">Navigator</h2><span></span></div>
+    <div class="search-box"><svg><use href="#i-search"/></svg><input id="navSearch" type="search" autocomplete="off" data-i18n-ph="searchDest" placeholder="Search destination…"><button id="navClear" class="hidden" aria-label="Clear"><svg><use href="#i-close"/></svg></button></div>
+    <div class="sheet-scroll">
+      <div id="navResults" class="results hidden"></div>
+      <div id="navEmpty" class="nav-empty">
+        <svg><use href="#i-search"/></svg>
+        <p data-i18n="enterDest">Enter a destination to calculate a route.</p>
+      </div>
+      <div class="group route-opts">
+        <label class="row opt"><svg class="c-orange"><use href="#i-euro"/></svg><span class="opt-text"><b data-i18n="avoidTolls">Avoid tolls</b><small data-i18n="avoidTollsSub"></small></span><input type="checkbox" class="toggle" id="optTolls"></label>
+        <label class="row opt"><svg class="c-blue"><use href="#i-road"/></svg><span class="opt-text"><b data-i18n="avoidMotorways">Avoid motorways</b><small data-i18n="avoidMotorwaysSub"></small></span><input type="checkbox" class="toggle" id="optMotorways"></label>
+        <label class="row opt"><svg class="c-blue"><use href="#i-ferry"/></svg><span class="opt-text"><b data-i18n="avoidFerries">Avoid ferries</b><small data-i18n="avoidFerriesSub"></small></span><input type="checkbox" class="toggle" id="optFerries"></label>
+      </div>
+      <div class="quick-grid">
+        <button class="quick" id="qSave"><span class="q-ic q-red"><svg><use href="#i-pin"/></svg></span><span data-i18n="savePlace">Save place</span></button>
+        <button class="quick" id="qFav"><span class="q-ic q-yellow"><svg><use href="#i-star"/></svg></span><span data-i18n="favorites">Favorites</span></button>
+        <button class="quick" id="qGpx"><span class="q-ic q-green"><svg><use href="#i-gpx"/></svg></span><span data-i18n="loadGpx">Load GPX</span></button>
+        <button class="quick" id="qRoutes"><span class="q-ic q-orange"><svg><use href="#i-route"/></svg></span><span data-i18n="motoRoutes">Moto routes</span></button>
+        <button class="quick" id="qFuel"><span class="q-ic q-orange"><svg><use href="#i-fuel"/></svg></span><span data-i18n="fuel">Fuel</span></button>
+        <button class="quick" id="qFood"><span class="q-ic q-cyan"><svg><use href="#i-food"/></svg></span><span data-i18n="restaurants">Restaurants</span></button>
+        <button class="quick" id="qHotel"><span class="q-ic q-purple"><svg><use href="#i-bed"/></svg></span><span data-i18n="hotels">Hotels</span></button>
+        <button class="quick" id="qParking"><span class="q-ic q-blue"><svg><use href="#i-parking"/></svg></span><span data-i18n="parking">Parking</span></button>
+      </div>
+      <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" class="hidden">
+      <div style="height:30px"></div>
+    </div>
+    <div class="sheet-foot hidden" id="routeFoot">
+      <div class="route-summary"><b id="routeName"></b><span id="routeStats"></span></div>
+      <button class="big-btn accent" id="btnStartNav" data-i18n="startNav">Start navigation</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
