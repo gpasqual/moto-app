@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   mount: 'bars',            // 'bars' | 'frame' | 'bag'
   invertLean: false,
   autoCal: true,
+  autoZero: true,           // learn the straight-riding zero from long straights
   voice: true,
   mapStyle: 'light',        // 'light' | 'dark'
   follow: true,

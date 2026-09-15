@@ -138,6 +138,16 @@ export class LeanEstimator {
     return rot;
   }
 
+  // Shift the reference so a reading of `deg` (as displayed, +right) becomes 0. Used by auto-zero.
+  applyRollOffset(deg) {
+    if (!this.cal || !Number.isFinite(deg) || deg === 0) return;
+    const d = (this.invert ? -deg : deg) * RAD;
+    const { g0, r } = this.cal;
+    const g1 = norm([g0[0] * Math.cos(d) + r[0] * Math.sin(d), g0[1] * Math.cos(d) + r[1] * Math.sin(d), g0[2] * Math.cos(d) + r[2] * Math.sin(d)]);
+    this._deriveAxes(g1);
+    this.onCalibrated && this.onCalibrated(this.exportCalibration());
+  }
+
   // Begin a calibration: average the next `ms` of samples, then lock in.
   startCalibration(ms = 1000) {
     this.calSamples = { sum: [0, 0, 0], n: 0, until: performance.now() + ms };

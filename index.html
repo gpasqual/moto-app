@@ -67,14 +67,22 @@
 
 <div id="app">
   <header class="topbar">
-    <button id="btnStart" class="round-btn start" aria-label="Start"><svg><use href="#i-play"/></svg></button>
     <div class="title">
       <span data-i18n="appTitleA">MOTO</span>
       <button id="btnReset" class="reset-btn" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>
       <span data-i18n="appTitleB">NG</span>
     </div>
-    <button id="btnMenu" class="round-btn menu" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
   </header>
+
+  <section id="navStrip" class="nav-strip">
+    <div class="ns-icon" id="nsIcon"></div>
+    <div class="ns-main">
+      <div class="ns-dist" id="nsDist">--</div>
+      <div class="ns-road" id="nsRoad"></div>
+    </div>
+    <div class="ns-then hidden" id="nsThen"><small data-i18n="then">then</small><div class="ns-then-icon" id="nsThenIcon"></div></div>
+    <button id="btnEndNav" class="ns-end" aria-label="End navigation"><svg><use href="#i-close"/></svg></button>
+  </section>
 
   <section class="map-panel" id="mapPanel">
     <div id="map"></div>
@@ -83,11 +91,6 @@
     <button id="btnExpand" class="map-btn bl" aria-label="Expand"><svg class="ic-expand"><use href="#i-expand"/></svg><svg class="ic-collapse"><use href="#i-collapse"/></svg></button>
     <button id="btnLocate" class="map-btn br" aria-label="Locate"><svg><use href="#i-locate"/></svg></button>
     <div id="gpsStatus" class="gps-status"></div>
-    <div id="navBanner" class="nav-banner hidden">
-      <div class="nb-icon" id="nbIcon"></div>
-      <div class="nb-text"><div class="nb-dist" id="nbDist">--</div><div class="nb-instr" id="nbInstr"></div></div>
-      <button id="btnEndNav" class="nb-close" aria-label="End navigation"><svg><use href="#i-close"/></svg></button>
-    </div>
     <div id="speedPill" class="speed-pill"><span id="pillSpeed">0</span><small id="pillUnit">km/h</small><em id="pillLean">0°</em></div>
   </section>
 
@@ -121,6 +124,11 @@
       <button id="sensorOverlay" class="sensor-overlay hidden" data-i18n="enableSensors">Tap to enable lean sensor</button>
     </div>
     <div class="panel lean-side"><svg class="lean-ic"><use href="#i-turn-right"/></svg><div class="lean-val" id="leanR">0°</div></div>
+  </section>
+
+  <section class="actionbar">
+    <button id="btnMenu" class="bar-btn" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+    <button id="btnStart" class="rec-btn" aria-label="Start"><svg><use href="#i-play"/></svg><span id="recLabel" data-i18n="start">Start</span></button>
   </section>
 </div>
 
@@ -164,6 +172,8 @@
         <div class="row-hint" id="mountHint"></div>
         <label class="row"><span data-i18n="invertLean">Invert left/right</span><input type="checkbox" class="toggle" id="setInvert"></label>
         <label class="row"><span data-i18n="autoCal">Auto-calibrate on first reading</span><input type="checkbox" class="toggle" id="setAutoCal"></label>
+        <label class="row"><span data-i18n="autoZero">Auto-zero on straights</span><input type="checkbox" class="toggle" id="setAutoZero"></label>
+        <div class="row-hint" data-i18n="autoZeroHint"></div>
       </div>
 
       <div class="group-title"><svg class="c-orange"><use href="#i-globe"/></svg><span data-i18n="language">LANGUAGE</span></div>

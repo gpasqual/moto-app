@@ -1,13 +1,14 @@
 import { t, setLang, getLang, applyDom, aboutContent } from './i18n.js';
 import { loadSettings, saveSettings, loadFavorites, saveFavorites, loadCalibration, saveCalibration, saveSession, deleteSession, clearSessions, listSessions, getSession, getImu } from './storage.js';
 import { LeanEstimator, leanInFrame } from './lean.js';
+import { AutoZero } from './autozero.js';
 import { Session, RideSimulator, haversine } from './telemetry.js';
 import { createGauge } from './gauge.js';
 import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -30,6 +31,7 @@ const S = {
   wakeLock: null,
   selectMode: false, selected: new Set(),
   calBefore: null,
+  autoZero: new AutoZero(),
   detailMap: null, detailSession: null,
 };
 
@@ -87,6 +89,7 @@ function applySettings(prev = {}) {
   document.querySelectorAll('.u-dist').forEach(e => e.textContent = t(imperial() ? 'ft' : 'm'));
   $('speedUnit').textContent = speedUnit(); $('pillUnit').textContent = speedUnit();
   $('mountHint').textContent = t(s.mount === 'bars' ? 'posHint' : 'posHintFrame');
+  const rl = $('recLabel'); if (rl) rl.textContent = t(S.recording ? 'stop' : 'start');
   S.lean.setMount(s.mount); S.lean.setInvert(s.invertLean);
   if (S.map) {
     if (prev.mapStyle !== s.mapStyle) S.map.setStyle(s.mapStyle);
@@ -98,6 +101,7 @@ function applySettings(prev = {}) {
   $('appVersion').textContent = VERSION;
   // Reflect into settings controls
   $('setAccent').value = s.accent; $('setMount').value = s.mount; $('setInvert').checked = s.invertLean; $('setAutoCal').checked = s.autoCal;
+  $('setAutoZero').checked = s.autoZero !== false;
   $('setLang').value = s.lang; $('setUnits').value = s.units; $('setVoice').checked = s.voice; $('setMapStyle').value = s.mapStyle;
   $('setFollow').checked = s.follow; $('setAwake').checked = s.keepAwake; $('setDemo').checked = s.demo;
   $('optTolls').checked = s.avoidTolls; $('optMotorways').checked = s.avoidMotorways; $('optFerries').checked = s.avoidFerries;
@@ -136,6 +140,7 @@ function onFix(fix) {
   else { gs.textContent = ''; gs.classList.remove('warn'); }
 
   S.stats.addFix(fix);
+  if (!S.settings.demo) S.autoZero.addFix(fix.speed, moving ? fix.heading : null, fix.t);
   if (S.recording) S.map.addTrackPoint(fix.lat, fix.lng);
   if (S.guidance) updateGuidance(fix);
   renderStats();
@@ -245,6 +250,10 @@ function onOrientation(e) {
 }
 function applyLean(ang, valid = true) {
   if (valid) S.stats.addLean(ang); // implausible angles (phone being handled/turned) never feed the maxes
+  if (valid && S.settings.autoZero !== false && !S.settings.demo && S.lean.cal) {
+    const corr = S.autoZero.addLean(ang, Date.now());
+    if (corr != null) applyAutoZero(corr);
+  }
   // Sensor events arrive at ~60 Hz; repaint at most every 40 ms.
   const now = performance.now();
   if (now - lastLeanPaint < 40) return;
@@ -260,7 +269,16 @@ async function calibrate() {
   if (!ok) return;
   $('btnCal').classList.add('busy'); $('btnCal').textContent = t('calibrating');
   S.calBefore = S.lean.cal; // remembered so the session maxes can be corrected for the reference shift
+  S.autoZero.reset();
   S.lean.startCalibration(1200);
+}
+// Auto-zero: fold a straight-riding offset into the calibration reference and shift the maxes accordingly.
+function applyAutoZero(delta) {
+  S.lean.applyRollOffset(delta);          // persists through onCalibrated
+  S.stats.maxLeanR = Math.max(0, S.stats.maxLeanR - delta);
+  S.stats.maxLeanL = Math.max(0, S.stats.maxLeanL + delta);
+  paintLeanMax();
+  if (Math.abs(delta) >= 0.5) toast(t('autoZeroed', { d: (delta > 0 ? '−' : '+') + Math.abs(delta).toFixed(1) }));
 }
 // After a re-CAL the old maxes are off by exactly the roll shift between the two references, so shift them back.
 // A shift beyond 30° means the phone was moved/turned, not touched up: those maxes were meaningless.
@@ -291,7 +309,7 @@ function startRecording() {
   S.recording = true;
   S.map.clearTrack();
   $('btnStart').classList.add('recording');
-  $('btnStart').innerHTML = '<svg><use href="#i-stop"/></svg>';
+  $('btnStart').innerHTML = `<svg><use href="#i-stop"/></svg><span id="recLabel">${t('stop')}</span>`;
   updateWakeLock();
   renderStats();
 }
@@ -306,7 +324,7 @@ async function stopRecording() {
   S.recording = false;
   const data = S.stats.finish();
   $('btnStart').classList.remove('recording');
-  $('btnStart').innerHTML = '<svg><use href="#i-play"/></svg>';
+  $('btnStart').innerHTML = `<svg><use href="#i-play"/></svg><span id="recLabel">${t('start')}</span>`;
   updateWakeLock();
   if (choice === 'discard') { toast(t('sessionDiscarded')); return; }
   try { await saveSession(data); toast(t('sessionSaved')); }
@@ -437,7 +455,7 @@ function startNavigation() {
   if (!S.route) return;
   S.guidance = makeGuidance(S.route);
   closeSheet('sheetNav');
-  $('navBanner').classList.remove('hidden');
+  $('app').classList.add('navigating');
   S.map.setFollow(true);
   updateWakeLock();
   if (S.lastFix) updateGuidance(S.lastFix);
@@ -446,7 +464,7 @@ async function endNavigation(confirmFirst = false) {
   if (confirmFirst && !await confirmSheet(t('endNavConfirm'), t('yesEnd'))) return;
   S.guidance = null; S.route = null;
   S.map.clearRoute();
-  $('navBanner').classList.add('hidden');
+  $('app').classList.remove('navigating');
   $('routeFoot').classList.add('hidden');
   $('nvEta').textContent = '--:--'; $('nvRemain').textContent = '--';
   try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ }
@@ -454,13 +472,17 @@ async function endNavigation(confirmFirst = false) {
 function updateGuidance(fix) {
   const g = S.guidance.update(fix.lat, fix.lng, fix.speed || 0);
   if (!g) return;
-  const b = $('navBanner');
+  const b = $('navStrip');
   b.classList.toggle('offroute', g.offRoute);
   if (g.next) {
-    $('nbIcon').innerHTML = maneuverIcon(g.next.key);
-    $('nbDist').textContent = fmtDist(g.distToNext, true);
-    $('nbInstr').textContent = instructionText(g.next);
+    $('nsIcon').innerHTML = maneuverIcon(g.next.key);
+    $('nsDist').textContent = fmtDist(g.distToNext, true);
+    $('nsRoad').textContent = instructionText(g.next);
     b.classList.toggle('arrive', g.next.key === 'arrive');
+    // Preview the following turn when it comes soon after this one
+    const soon = g.after && (g.after.at - g.next.at) < 400;
+    $('nsThen').classList.toggle('hidden', !soon);
+    if (soon) $('nsThenIcon').innerHTML = maneuverIcon(g.after.key);
   }
   $('nvRemain').textContent = fmtDist(g.remaining, true);
   $('nvEta').textContent = fmtClock(new Date(Date.now() + g.etaSec * 1000));
@@ -816,6 +838,7 @@ $('setAccent').addEventListener('change', e => updateSetting('accent', e.target.
 $('setMount').addEventListener('change', e => updateSetting('mount', e.target.value));
 $('setInvert').addEventListener('change', e => updateSetting('invertLean', e.target.checked));
 $('setAutoCal').addEventListener('change', e => updateSetting('autoCal', e.target.checked));
+$('setAutoZero').addEventListener('change', e => { updateSetting('autoZero', e.target.checked); S.autoZero.reset(); });
 $('setLang').addEventListener('change', e => updateSetting('lang', e.target.value));
 $('setUnits').addEventListener('change', e => updateSetting('units', e.target.value));
 $('setVoice').addEventListener('change', e => updateSetting('voice', e.target.checked));

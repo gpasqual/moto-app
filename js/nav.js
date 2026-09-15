@@ -159,8 +159,12 @@ export class Guidance {
 
     const remaining = Math.max(0, this.route.total - this.progress);
     const steps = this.route.steps;
-    let next = null;
-    for (const s of steps) { if (s.key !== 'depart' && s.at > this.progress - 15) { next = s; break; } }
+    let next = null, after = null;
+    for (const s of steps) {
+      if (s.key === 'depart') continue;
+      if (!next) { if (s.at > this.progress - 15) next = s; }
+      else if (s.at > next.at) { after = s; break; }
+    }
     const distToNext = next ? Math.max(0, next.at - this.progress) : 0;
 
     if (next && !offRoute) {
@@ -182,7 +186,7 @@ export class Guidance {
     }
     const avgV = this.route.duration > 0 ? this.route.total / this.route.duration : 15;
     const etaSec = remaining / Math.max(avgV, 3);
-    return { next, distToNext, remaining, etaSec, offRoute, snapped: match.snapped };
+    return { next, after, distToNext, remaining, etaSec, offRoute, snapped: match.snapped };
   }
 
   _nearest(lat, lng, from, to) {

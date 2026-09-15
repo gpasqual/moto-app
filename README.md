@@ -69,7 +69,10 @@ Open in Chrome → menu → **Install app** (or "Add to Home screen").
 
 - **Mount the phone**, then set **Settings › Phone position** to where it lives (Handlebar or Frame/Tank).
 - With the bike **upright and the bars straight**, tap **CAL**. The calibration is remembered; re-CAL if you move the mount.
-- Tap **▶** to start recording a session, **■** to stop and save it. The ⟳ button zeros the live stats.
+- Tap **START** (bottom bar) to record a session, **STOP** to end and save it. The ⟳ button in the title zeros the live stats.
+- **Auto-zero**: while riding, long straights (≥ 6 s, > 30 km/h, heading steady) are taken as level and the
+  duration-weighted median of their lean is folded into the calibration (Settings › Auto-zero on straights).
+  Corrections are applied 1 s into a steady straight, never mid-corner, capped at 3° per step; road camber can leave ~1°.
 - Tap **⤢** on the map for full-screen map + speed/lean pill (best with navigation).
 - Keep the app in the **foreground** while riding. Like any web app it cannot record GPS in the background;
   *Keep screen on* is enabled by default so the display stays awake.
@@ -104,6 +107,7 @@ js/app.js               controller: GPS, sensors, session lifecycle, UI, setting
 js/telemetry.js         Session stats from GPS fixes; RideSimulator for demo mode
 js/lean.js              LeanEstimator (orientation → lean angle, calibration, mount handling)
 js/gauge.js             SVG lean dial
+js/autozero.js          straight-riding auto-zero of the lean calibration
 js/chart.js             touch time-history chart for the analytics sheet
 js/map.js               Leaflet wrapper (position, track, route, POIs, light/dark)
 js/nav.js               Nominatim geocoding, OSRM routing, guidance + voice, Overpass POIs, GPX
