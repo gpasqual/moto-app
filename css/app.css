@@ -27,7 +27,7 @@
 [data-accent="white"]  { --accent: #f2f2f5; --accent-soft: rgba(242,242,245,0.14); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overscroll-behavior: none; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overscroll-behavior: none; overflow-x: hidden; }
 body {
   /* carbon-fibre weave */
   background-color: var(--bg);
@@ -43,14 +43,17 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 .hidden { display: none !important; }
 .mono { font-family: var(--mono); }
 .muted { color: var(--muted); }
-.c-orange { color: var(--accent); } .c-blue { color: var(--blue); } .c-green { color: var(--green); } .c-yellow { color: var(--yellow); } .c-muted { color: var(--muted); }
+.c-orange { color: var(--accent); } .c-red { color: var(--red); } .c-blue { color: var(--blue); } .c-green { color: var(--green); } .c-yellow { color: var(--yellow); } .c-muted { color: var(--muted); }
 
 /* ===== App grid ===== */
 #app {
   height: 100dvh; height: 100vh; height: 100dvh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* rows may never widen the page: long road names ellipsize instead */
   grid-template-rows: auto minmax(120px, 1fr) auto auto auto auto;
+  max-width: 100vw; overflow: hidden;
 }
+#app > * { min-width: 0; }
 #app.navigating { grid-template-rows: auto auto minmax(120px, 1fr) auto auto auto auto; }
 #app.navigating.map-expanded { grid-template-rows: auto auto 1fr auto; }
 #app:not(.navigating) .nav-strip { display: none; }
@@ -110,10 +113,10 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 .poi-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #111; font-weight: 800; font-size: 13px; display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 
 /* Turn-by-turn strip: its own grid row between the header and the map, so it never covers a map control */
-.nav-strip { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; border-radius: var(--radius); background: var(--panel); border: 1.5px solid var(--accent); min-height: 72px; }
+.nav-strip { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; border-radius: var(--radius); background: var(--panel); border: 1.5px solid var(--accent); min-height: 72px; min-width: 0; cursor: pointer; }
 .ns-icon { width: 56px; height: 56px; flex: 0 0 auto; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border-radius: 14px; }
 .ns-icon svg { width: 44px; height: 44px; }
-.ns-main { flex: 1; min-width: 0; }
+.ns-main { flex: 1 1 0; min-width: 0; overflow: hidden; }
 .ns-dist { font-family: var(--mono); font-weight: 700; font-size: 30px; line-height: 1; letter-spacing: -0.5px; }
 .ns-road { font-size: 15px; color: #d8d8e0; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ns-then { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; padding: 0 4px; border-left: 1px solid var(--line); }
@@ -131,11 +134,12 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 .speed-pill em { font-style: normal; font-size: 20px; color: var(--needle); margin-left: 8px; }
 
 /* ===== Nav row ===== */
-.nav-row { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.nav-cell { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 4px; border-right: 1px solid var(--line); }
+.nav-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.nav-cell { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 2px; border-right: 1px solid var(--line); min-width: 0; overflow: hidden; }
+.nav-cell > div { min-width: 0; }
 .nav-cell:last-child { border-right: 0; }
 .nav-ic { color: var(--accent); font-size: 20px; flex: 0 0 auto; }
-.nav-val { font-family: var(--mono); font-weight: 700; font-size: 18px; line-height: 1.1; white-space: nowrap; }
+.nav-val { font-family: var(--mono); font-weight: 700; font-size: 17px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
 
 /* ===== Panels ===== */
@@ -179,6 +183,8 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 .menu-item { display: flex; align-items: center; gap: 14px; background: #1a1a20; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font-size: 18px; font-weight: 600; }
 .menu-item svg { font-size: 24px; }
 .menu-item.cancel { justify-content: center; color: var(--accent); background: #101014; margin-top: 4px; }
+#miEndNav { color: var(--red); border-color: rgba(255,77,77,0.4); }
+.nav-strip:active { background: #1a1a22; }
 .menu-item.primary { justify-content: center; background: var(--accent); color: #111; }
 .menu-item.danger { justify-content: center; color: var(--red); }
 .menu-item.plain { justify-content: center; }
@@ -307,9 +313,9 @@ svg:where(:not([class*="leaflet"])) { width: 1em; height: 1em; display: inline-b
 
 /* Landscape phones: map + action bar on the left, stats over lean panels on the right; no title */
 @media (orientation: landscape) and (max-height: 500px) {
-  #app { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr auto; grid-template-areas: "map stats" "map lean" "map lean" "bar lean"; }
+  #app { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; grid-template-areas: "map stats" "map lean" "map lean" "bar lean"; }
   #app.navigating { grid-template-rows: auto auto auto 1fr auto; grid-template-areas: "strip strip" "map stats" "map lean" "map lean" "bar lean"; }
-  #app.map-expanded { grid-template-columns: 1fr; grid-template-rows: 1fr auto; grid-template-areas: "map" "bar"; }
+  #app.map-expanded { grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: "map" "bar"; }
   #app.navigating.map-expanded { grid-template-rows: auto 1fr auto; grid-template-areas: "strip" "map" "bar"; }
   .topbar { display: none; }
   .nav-strip { grid-area: strip; min-height: 52px; }

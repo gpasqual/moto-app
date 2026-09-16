@@ -8,7 +8,7 @@ import { createChart, lowerBound } from './chart.js';
 import { createMap } from './map.js';
 import { geocode, fetchRoute, Guidance, instructionText, maneuverIcon, speak, nearbyPois, parseGpx, sessionToGpx } from './nav.js';
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.5.1';
 const APP_NAME = 'MOTO-NG';
 const APP_URL = 'https://gpasqual.github.io/moto-app/';
 const REPO_URL = 'https://github.com/gpasqual/moto-app';
@@ -465,6 +465,7 @@ async function endNavigation(confirmFirst = false) {
   S.guidance = null; S.route = null;
   S.map.clearRoute();
   $('app').classList.remove('navigating');
+  $('btnStartNav').classList.remove('hidden'); $('btnEndNavSheet').classList.add('hidden');
   $('routeFoot').classList.add('hidden');
   $('nvEta').textContent = '--:--'; $('nvRemain').textContent = '--';
   try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { /* ignore */ }
@@ -577,6 +578,20 @@ $('qHotel').addEventListener('click', () => poi('hotels', 'hotels', 'i-bed'));
 $('qParking').addEventListener('click', () => poi('parking', 'parking', 'i-parking'));
 $('btnStartNav').addEventListener('click', startNavigation);
 $('btnEndNav').addEventListener('click', () => endNavigation(true));
+$('navStrip').addEventListener('click', e => { if (!e.target.closest('#btnEndNav')) endNavigation(true); });
+$('miEndNav').addEventListener('click', () => { closeSheet('sheetMenu'); endNavigation(true); });
+$('btnEndNavSheet').addEventListener('click', () => { closeSheet('sheetNav'); endNavigation(true); });
+// The navigator sheet shows the active route with an End button while guiding
+function refreshNavSheet() {
+  const on = !!S.guidance;
+  $('btnStartNav').classList.toggle('hidden', on);
+  $('btnEndNavSheet').classList.toggle('hidden', !on);
+  if (on) {
+    $('routeName').textContent = `${t('routeTo')} ${S.routeName}`;
+    $('routeStats').textContent = `${fmtDist(S.route.total)} · ${fmtDuration(S.route.duration)}`;
+    $('routeFoot').classList.remove('hidden');
+  }
+}
 for (const [id, key] of [['optTolls', 'avoidTolls'], ['optMotorways', 'avoidMotorways'], ['optFerries', 'avoidFerries']]) {
   $(id).addEventListener('change', e => { updateSetting(key, e.target.checked); if (S.route && !S.guidance) routeTo(S.route.dest, S.routeName); });
 }
@@ -822,11 +837,11 @@ $('btnStart').addEventListener('click', async () => {
   startRecording();
 });
 $('btnReset').addEventListener('click', resetStats);
-$('btnMenu').addEventListener('click', () => openSheet('sheetMenu'));
-$('miNav').addEventListener('click', () => { closeSheet('sheetMenu'); openSheet('sheetNav'); });
+$('btnMenu').addEventListener('click', () => { $('miEndNav').classList.toggle('hidden', !S.guidance); openSheet('sheetMenu'); });
+$('miNav').addEventListener('click', () => { closeSheet('sheetMenu'); refreshNavSheet(); openSheet('sheetNav'); });
 $('miHistory').addEventListener('click', () => { closeSheet('sheetMenu'); S.selectMode = false; S.selected.clear(); renderHistory(); openSheet('sheetHistory'); });
 $('miSettings').addEventListener('click', () => { closeSheet('sheetMenu'); openSheet('sheetSettings'); });
-$('btnSearch').addEventListener('click', () => openSheet('sheetNav'));
+$('btnSearch').addEventListener('click', () => { refreshNavSheet(); openSheet('sheetNav'); });
 $('btnLocate').addEventListener('click', () => { S.map.setFollow(true); });
 $('btnExpand').addEventListener('click', () => { $('app').classList.toggle('map-expanded'); S.map.invalidate(); });
 $('compass').addEventListener('click', () => { S.map.setFollow(true); });

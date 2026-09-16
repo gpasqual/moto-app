@@ -1,6 +1,6 @@
 // App-shell service worker: network-first for our own files (always fresh when online,
 // still works offline), pass-through for map tiles and API calls.
-const VERSION = 'moto-ng-v1.5.0';
+const VERSION = 'moto-ng-v1.5.1';
 const SHELL = [
   './', 'index.html', 'css/app.css',
   'js/app.js', 'js/i18n.js', 'js/storage.js', 'js/lean.js', 'js/telemetry.js', 'js/gauge.js', 'js/chart.js', 'js/autozero.js', 'js/map.js', 'js/nav.js',

@@ -136,6 +136,7 @@
 <div id="sheetMenu" class="sheet sheet-menu hidden">
   <div class="sheet-backdrop" data-close></div>
   <div class="sheet-body menu-body">
+    <button class="menu-item hidden" id="miEndNav"><svg class="c-red"><use href="#i-close"/></svg><span data-i18n="endNav">End navigation</span></button>
     <button class="menu-item" id="miNav"><svg class="c-orange"><use href="#i-nav"/></svg><span data-i18n="navigator">Navigator</span></button>
     <button class="menu-item" id="miHistory"><svg class="c-blue"><use href="#i-moto"/></svg><span data-i18n="history">Session history</span></button>
     <button class="menu-item" id="miSettings"><svg class="c-muted"><use href="#i-menu"/></svg><span data-i18n="settings">Settings</span></button>
@@ -284,6 +285,7 @@
     <div class="sheet-foot hidden" id="routeFoot">
       <div class="route-summary"><b id="routeName"></b><span id="routeStats"></span></div>
       <button class="big-btn accent" id="btnStartNav" data-i18n="startNav">Start navigation</button>
+      <button class="big-btn danger hidden" id="btnEndNavSheet" data-i18n="endNav">End navigation</button>
     </div>
   </div>
 </div>
